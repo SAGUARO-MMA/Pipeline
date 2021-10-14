@@ -67,7 +67,7 @@ def action(event,date,read_path,write_path,field):
             break
         else:
             t2 = datetime.datetime.utcnow()
-            if (t2-t1).total_seconds() > 300:
+            if (t2-t1).total_seconds() > 1800:
                 break
             else:
                 time.sleep(1)
