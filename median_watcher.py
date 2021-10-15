@@ -4,7 +4,7 @@
 Script to create median images from the 4 CSS images per field.
 '''
 
-__version__ = "1.0" #last updated 30/09/2021
+__version__ = "1.1" #last updated 15/10/2021
 
 import sys
 import numpy as np
@@ -121,7 +121,7 @@ def action(event,date,read_path,write_path,field):
                         bad_images += 1
                 except:
                     logging.critical('Error with file '+f)
-                with fits.open('/home/saguaro/software/css_bpm.fits') as hdr:
+                with fits.open(css.bad_pixel_mask()) as hdr:
                     mask_header = hdr[0].header
                     data = hdr[0].data
                     fits.writeto(c.replace('.calb.fz','_mask.fits'),data,mask_header+header,output_verify='fix+ignore')
