@@ -4,7 +4,7 @@
 Pipeline for real-time data reduction and image subtraction.
 '''
 
-__version__ = "1.1" #last updated 29/09/2021
+__version__ = "1.2" #last updated 25/10/2021
 
 import sys
 import numpy as np
@@ -332,7 +332,7 @@ def main(telescope=None,date=None,cpu=None):
     tel_delta = tel.tel_delta()
     if date is None: #if no date is given, run in real-time
         submit_all = False
-        date = (datetime.datetime.utcnow()+datetime.timedelta(hours=time_zone)-datetime.timedelta(1)).strftime('%Y/%m/%d')
+        date = (datetime.datetime.utcnow()+datetime.timedelta(hours=tel_zone)).strftime('%Y/%m/%d')
     else: #if date is given, replace - / .
         submit_all = True
         if '-' in date:
