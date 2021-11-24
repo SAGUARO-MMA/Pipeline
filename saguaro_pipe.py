@@ -4,7 +4,7 @@
 Pipeline for real-time data reduction and image subtraction.
 '''
 
-__version__ = "1.2" #last updated 25/10/2021
+__version__ = "1.4" #last updated 10/11/2021
 
 import sys
 import numpy as np
@@ -70,8 +70,8 @@ def cleanup(file,ref,unique_dir):
         if '.fits' in ext:
             f = fpack_file(f)
         subprocess.call(['mv',f,cp_dir])
-    extra = glob.glob('*.pdf')
-    extra += glob.glob('*.reg')
+    extra = glob.glob(file.replace('.fits','')+'*.pdf')
+    extra += glob.glob(file.replace('.fits','')+'*.reg')
     for x in extra: subprocess.call(['mv',x,cp_dir])
     return
 
@@ -306,7 +306,7 @@ class FileWatcher(FileSystemEventHandler,object):
         '''
         Add new file to queue.
         '''
-        self._queue.put([event,self._telescope])
+        self._queue.apply_async(action,[[event,self._telescope]])
 
 def main(telescope=None,date=None,cpu=None):
     '''
@@ -332,7 +332,7 @@ def main(telescope=None,date=None,cpu=None):
     tel_delta = tel.tel_delta()
     if date is None: #if no date is given, run in real-time
         submit_all = False
-        date = (datetime.datetime.utcnow()+datetime.timedelta(hours=tel_zone)).strftime('%Y/%m/%d')
+        date = (datetime.datetime.utcnow()+datetime.timedelta(hours=tel_zone)+datetime.timedelta(hours=tel_delta)).strftime('%Y/%m/%d')
     else: #if date is given, replace - / .
         submit_all = True
         if '-' in date:
@@ -427,27 +427,28 @@ def main(telescope=None,date=None,cpu=None):
             logging.shutdown()
             shutil.move(work_path+log_file_name+'.log',write_path+log_path) #move log file to correct location
         else: #reduce data in real time, don't redo files alread reduced
-            queue = multiprocessing.Queue() #create queue for submitting jobs
-            pool = Pool(cpu,action,(queue,)) #create pool with given CPUs and queue feeding into action function  
+            pool = Pool(cpu) #create pool with given CPUs and queue feeding into action function  
             observer = Observer() #create observer
-            observer.schedule(FileWatcher(queue,telescope), read_path, recursive=False) #setup observer
+            observer.schedule(FileWatcher(pool,telescope), read_path, recursive=False) #setup observer
             files = sorted(glob.glob(read_path+'/'+file_name)) #glob any files already there
             for f in files: #loop through waiting files
                 if tel.output(f,date):
                     q.put(logger.info('Output already exists, skipping image'))
                 else:
-                    queue.put([f,telescope]) #add waiting files to pool
+                    pool.apply_async(action,[[f,telescope]]) #add waiting files to pool
             observer.start() #start observer
             while True: #continue to monitor
                 done = scheduled_exit(datetime.datetime.utcnow(),telescope) #check if scheduled exit time has been reached
                 if done: #if scheduled exit time has been reached, exit pipeline
-                    while not queue.empty:
+                    while pool._cache != {}:
                         time.sleep(1)
                     q.put(logger.critical('Scheduled time reached, exiting pipeline.'))
                     final_number = len(glob.glob(write_path+red_path+'*_trans.fits*'))
                     q.put(logger.critical('Summary: '+str(len(glob.glob(read_path+'/'+file_name)))+' input images found, '+str(final_number)+' successfully processed.'))
                     observer.stop() #stop observer
                     observer.join() #join observer
+                    pool.close() #close pool
+                    pool.join() #join pool
                     logging.shutdown()
                     shutil.move(work_path+log_file_name+'.log',write_path+log_path) #move log file to correct location
                     sys.exit()

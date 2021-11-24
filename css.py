@@ -4,7 +4,7 @@
 Telescope setting file for CSS 1.5m Mt Lemmon telescope.
 '''
 
-__version__ = "1.0" #last updated 28/09/2021
+__version__ = "1.1" #last updated 10/11/2021
 
 import numpy as np
 import datetime
@@ -197,7 +197,7 @@ def tel_delta():
     '''
     Returns the adjustment to the time zone for the telescope.
     '''
-    return 0
+    return 7
 
 def science_process(science_file,unique_dir,log_file_name):
     '''
