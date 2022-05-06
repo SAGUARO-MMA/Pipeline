@@ -34,7 +34,7 @@ from sklearn.utils import shuffle
 import re,ast
 import pickle
 from astropy.utils.exceptions import AstropyWarning
-from email import email_field
+# from email import email_field
 
 
 def fieldcheck(field):
@@ -84,10 +84,10 @@ def fieldcheck(field):
         ft_test=[x for x in [ft1,ft2,ft3] if field in x]
         ft90_test=[x for x in [ft90] if field in x]
 
-        if ft_test !=[]:
-            email_field(gw,field,trigger=True)
-        elif ft90_test !=[]:
-            email_field(gw,field,trigger=False)
+        # if ft_test !=[]:
+        #     email_field(gw,field,trigger=True)
+        # elif ft90_test !=[]:
+        #     email_field(gw,field,trigger=False)
 
 def gwfields():
     db = newsql.Dictdb()
@@ -288,128 +288,138 @@ def imgscale(data):
 
 
 
-def ingestion(transCatalog):
-    file = transCatalog
-    classifier = pickle.load(open('rf_model.ml', 'rb'))
-    filelist=[file]
-    if file.split('_')[-1] == 'trans.fits.fz':
-        for ii in range(len(filelist)):
-            imgt0=time.time()
-            infile=filelist[ii]
-            hdul=fits.open(infile)
-            hdul.info()
-            hdr=hdul[1].header
-            image_data=hdul[1].data
-            basefile=os.path.basename(infile)
-            rawfile=basefile.replace('_red_trans.fits.fz','.arch.fz')
-            pngpath='/home/saguaro/data/png/'+basefile[4:8]+'/'+basefile[8:10]+'/'+basefile[10:12]
-            tfile=time.time()-imgt0
-            resfile,resnumber=newsql.pipecandmatch(basefile)
-            tpipecand=time.time()-imgt0
-            tpng,tpng2,tml,ttingest,tcingest,tglade,tmobjmatch,tgmatch,tpngsave=[],[],[],[],[],[],[],[],[]
-            field=str(hdr['OBJECT'])
-            if len(resfile) == 0 or len(resfile) < len(image_data):
-                print('####  Moving Object Classification  ####')
-                catalog=movingobjectcatalog(float(hdr['MJD']))
-                ra,dec=radectodecimal(hdr['RA'],hdr['DEC'])
-                filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
-                tmobj=time.time()-imgt0
-                gl=gladelist(str(hdr['OBJECT']))
+def ingestion(transCatalog,log):
+    log.info('Ingesting catalog.')
+    try:
+        ml_model = 'rf_model.ml'
+        log.info('Loading ML model: '+ml_model)
+        classifier = pickle.load(open(ml_model, 'rb'))
+    except:
+        log.error('Error loading ML model.')
+        return 'error'
+    if 'trans.fits' not in transCatalog:
+        log.error(transCatalog+' is not a transient catalog file.')
+        return 'error'
+    try:
+        imgt0=time.time()
+        hdul=fits.open(transCatalog)
+        hdul.info()
+        hdr=hdul[1].header
+        image_data=hdul[1].data
+        log.info(str(len(image_data))+' candidates found.')
+        rawfile=transCatalog.replace('_red_trans.fits','.arch')
+        pngpath_main='/home/saguaro/data/png/'+transCatalog[4:8]+'/'+transCatalog[8:10]+'/'+transCatalog[10:12]
+        tfile=time.time()-imgt0
+        resfile,resnumber=newsql.pipecandmatch(transCatalog)
+        tpipecand=time.time()-imgt0
+        tpng,tpng2,tml,ttingest,tcingest,tglade,tmobjmatch,tgmatch,tpngsave=[],[],[],[],[],[],[],[],[]
+        field=str(hdr['OBJECT'])
+        if len(resfile) == 0 or len(resfile) < len(image_data):
+            
+            ####  Moving Object Classification  ####'
+            catalog=movingobjectcatalog(float(hdr['MJD']))
+            ra,dec=radectodecimal(hdr['RA'],hdr['DEC'])
+            filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
+            tmobj=time.time()-imgt0
+            gl=gladelist(str(hdr['OBJECT']))
 
-                ###gaia stars in field###
-                gaiadict=gaialist(field)
+            ###gaia stars in field###
+            gaiadict=gaialist(field)
 
-                tggrab=time.time()-imgt0
-                tpng,tml,ttingest,tcingest,tglade,tmobjmatch,tgmatch=[],[],[],[],[],[],[]
-                for i in range(len(image_data)):
-                    row=image_data[i]
-                    rowt0=time.time()
-                    pngpath='/home/saguaro/data/png/'+basefile[4:8]+'/'+basefile[8:10]+'/'+basefile[10:12]+'/'+str(hdr['OBJECT'])
+            tggrab=time.time()-imgt0
+            tpng,tml,ttingest,tcingest,tglade,tmobjmatch,tgmatch=[],[],[],[],[],[],[]
+            for i in range(len(image_data)):
+                row=image_data[i]
+                rowt0=time.time()
+                pngpath=pngpath_main+'/'+str(hdr['OBJECT'])
 
-                    if str(row[0]) not in resnumber and float(row[9]) > 0.0:
-                        if np.mean(row[15])!=0: data=imgscale(row[15])
-                        if np.mean(row[15])==0: data=row[15]
-                        img = Image.fromarray(data)
-                        img=img.convert('L')
-
-
-                        if np.mean(row[16])!=0: data=imgscale(row[16])
-                        if np.mean(row[16])==0: data=row[16]
-                        ref = Image.fromarray(data)
-                        ref=ref.convert('L')
- 
-                        if np.mean(row[17])!=0: data=imgscale(row[17])
-                        if np.mean(row[17])==0: data=row[17]
-                        diff = Image.fromarray(data)
-                        diff=diff.convert('L')
-
-                        tpng.append((time.time()-rowt0))
-                        asize=64
-                        msize=10
-                        mldata=data[int(asize/2-msize/2):int(asize/2+msize/2),int(asize/2-msize/2):int(asize/2+msize/2)]
-                        mldata=( (mldata/np.nanmean(mldata))*np.log(1+(np.nanmean(mldata)/np.nanstd(mldata))) )
-                        score=(classifier.predict_proba(mldata.reshape((1, -1))))[0][1]
-
-                        tml.append(time.time()-rowt0)
-                        if np.mean(row[18])!=0: data=imgscale(row[18])
-                        if np.mean(row[18])==0: data=row[18]
-                        scorr = Image.fromarray(data)
-                        scorr=scorr.convert('L')
-
-                        tpng2.append((time.time()-rowt0))
-
-                    ####  Moving Object Classification  ####
-                        mvobj=movingobjectmatch(filtered_catalog,float(row[7]),float(row[8]), float(hdr['MJD']), 25.0)
-                        if len(mvobj)==0:
-                            classification='0'
-                        else:
-                            classification='1'
-
-                        tmobjmatch.append(time.time()-rowt0)
-
-                    ####  Previously detected object search  ####
-
-                        gmatch=gaiamatch(gaiadict,0.5,[float(row[7])],[float(row[8])])
-                        if gmatch == True:
-                            classification='7'
-                        else:
-                            classification='0'
-
-                        tgmatch.append(time.time()-rowt0)
+                if str(row[0]) not in resnumber and float(row[9]) > 0.0:
+                    if np.mean(row[15])!=0: data=imgscale(row[15])
+                    if np.mean(row[15])==0: data=row[15]
+                    img = Image.fromarray(data)
+                    img=img.convert('L')
 
 
-                        if len(row)==19:number,filename,xwin,ywin,errx2win,erry2win,errxywin,elongation,ra,dec,fwhm,snr,fluxpsf,fluxpsferr,mag,magerr,rawfilename,obsdate,field,seqnum,ncomb=str(row[0]),str(basefile),str(row[1]),str(row[2]),str(row[3]),str(row[4]),str(row[5]),str(row[6]),str(row[7]),str(row[8]),str(row[9]),str(row[10]),str(row[11]),str(row[12]),str(row[13]),str(row[14]),str(rawfile),str(hdr['DATE-OBS']),str(hdr['OBJECT']),str(hdr['SEQNUM']),str(hdr['NCOMBINE'])
+                    if np.mean(row[16])!=0: data=imgscale(row[16])
+                    if np.mean(row[16])==0: data=row[16]
+                    ref = Image.fromarray(data)
+                    ref=ref.convert('L')
 
- 
-                        if not 'DATE-MID' in hdr:
-                            datemid=str(datetime.datetime.strptime(hdr['DATE-OBS']+' '+hdr['TIME-OBS'],'%Y-%m-%d %H:%M:%S.%f')+datetime.timedelta(seconds=float(hdr['EXPTIME'])/2.))
-                            dmid=datemid.replace(" ","T",1)
-                        else:
-                            dmid=str(hdr['DATE-MID'])
-                        if not 'MJDMID' in hdr:
-                            mmjd=str(float(hdr['MJD'])+float(hdr['EXPTIME'])/2./86400.)
-                        else:
-                            mmjd=str(hdr['MJDMID'])
-                        res=newsql.ingesttargets(float(ra),float(dec),field,classification)
-                        ttingest.append(time.time()-rowt0)
+                    if np.mean(row[17])!=0: data=imgscale(row[17])
+                    if np.mean(row[17])==0: data=row[17]
+                    diff = Image.fromarray(data)
+                    diff=diff.convert('L')
 
-                        cx = np.cos( np.radians(float(ra)) )*np.cos( np.radians(float(dec)))
-                        cy = np.sin( np.radians(float(ra)) )*np.cos( np.radians(float(dec)))
-                        cz = np.sin( np.radians(float(dec)) )
+                    tpng.append((time.time()-rowt0))
+                    asize=64
+                    msize=10
+                    mldata=data[int(asize/2-msize/2):int(asize/2+msize/2),int(asize/2-msize/2):int(asize/2+msize/2)]
+                    mldata=( (mldata/np.nanmean(mldata))*np.log(1+(np.nanmean(mldata)/np.nanstd(mldata))) )
+                    score=(classifier.predict_proba(mldata.reshape((1, -1))))[0][1]
 
-                        match=gladematch(gl,50,cx,cy,cz)
-                        tglade.append(time.time()-rowt0)
-                        ret=newsql.ingestcandidateswithidreturn(number,filename,elongation,ra,dec,fwhm,snr,mag,magerr,rawfilename,obsdate,field,res['classification'][0],cx,cy,cz,res['targetid'][0],mmjd,score,ncomb,match)
-                        tcingest.append(time.time()-rowt0)
-                        if not os.path.exists(pngpath):os.makedirs(pngpath)
-                        visit=filename.split('_')[4]
-                        img.save(pngpath+'/'+str(row[0])+'_'+visit+'_img.png',"PNG")
-                        ref.save(pngpath+'/'+str(row[0])+'_'+visit+'_ref.png',"PNG")
-                        diff.save(pngpath+'/'+str(row[0])+'_'+visit+'_diff.png',"PNG")
-                        scorr.save(pngpath+'/'+str(row[0])+'_'+visit+'_scorr.png',"PNG")
-                        tpngsave.append(time.time()-rowt0)
+                    tml.append(time.time()-rowt0)
+                    if np.mean(row[18])!=0: data=imgscale(row[18])
+                    if np.mean(row[18])==0: data=row[18]
+                    scorr = Image.fromarray(data)
+                    scorr=scorr.convert('L')
+
+                    tpng2.append((time.time()-rowt0))
+
+                ####  Moving Object Classification  ####
+                    mvobj=movingobjectmatch(filtered_catalog,float(row[7]),float(row[8]), float(hdr['MJD']), 25.0)
+                    if len(mvobj)==0:
+                        classification='0'
+                    else:
+                        classification='1'
+
+                    tmobjmatch.append(time.time()-rowt0)
+
+                ####  Previously detected object search  ####
+
+                    gmatch=gaiamatch(gaiadict,0.5,[float(row[7])],[float(row[8])])
+                    if gmatch == True:
+                        classification='7'
+                    else:
+                        classification='0'
+
+                    tgmatch.append(time.time()-rowt0)
+
+
+                    if len(row)==19:number,filename,xwin,ywin,errx2win,erry2win,errxywin,elongation,ra,dec,fwhm,snr,fluxpsf,fluxpsferr,mag,magerr,rawfilename,obsdate,field,seqnum,ncomb=str(row[0]),str(basefile),str(row[1]),str(row[2]),str(row[3]),str(row[4]),str(row[5]),str(row[6]),str(row[7]),str(row[8]),str(row[9]),str(row[10]),str(row[11]),str(row[12]),str(row[13]),str(row[14]),str(rawfile),str(hdr['DATE-OBS']),str(hdr['OBJECT']),str(hdr['SEQNUM']),str(hdr['NCOMBINE'])
+
+
+                    if not 'DATE-MID' in hdr:
+                        datemid=str(datetime.datetime.strptime(hdr['DATE-OBS']+' '+hdr['TIME-OBS'],'%Y-%m-%d %H:%M:%S.%f')+datetime.timedelta(seconds=float(hdr['EXPTIME'])/2.))
+                        dmid=datemid.replace(" ","T",1)
+                    else:
+                        dmid=str(hdr['DATE-MID'])
+                    if not 'MJDMID' in hdr:
+                        mmjd=str(float(hdr['MJD'])+float(hdr['EXPTIME'])/2./86400.)
+                    else:
+                        mmjd=str(hdr['MJDMID'])
+                    res=newsql.ingesttargets(float(ra),float(dec),field,classification)
+                    ttingest.append(time.time()-rowt0)
+
+                    cx = np.cos( np.radians(float(ra)) )*np.cos( np.radians(float(dec)))
+                    cy = np.sin( np.radians(float(ra)) )*np.cos( np.radians(float(dec)))
+                    cz = np.sin( np.radians(float(dec)) )
+
+                    match=gladematch(gl,50,cx,cy,cz)
+                    tglade.append(time.time()-rowt0)
+                    ret=newsql.ingestcandidateswithidreturn(number,filename,elongation,ra,dec,fwhm,snr,mag,magerr,rawfilename,obsdate,field,res['classification'][0],cx,cy,cz,res['targetid'][0],mmjd,score,ncomb,match)
+                    tcingest.append(time.time()-rowt0)
+                    if not os.path.exists(pngpath):os.makedirs(pngpath)
+                    visit=filename.split('_')[4]
+                    img.save(pngpath+'/'+str(row[0])+'_'+visit+'_img.png',"PNG")
+                    ref.save(pngpath+'/'+str(row[0])+'_'+visit+'_ref.png',"PNG")
+                    diff.save(pngpath+'/'+str(row[0])+'_'+visit+'_diff.png',"PNG")
+                    scorr.save(pngpath+'/'+str(row[0])+'_'+visit+'_scorr.png',"PNG")
+                    tpngsave.append(time.time()-rowt0)
 
             fieldcheck(field)
-            tcomp=time.time()-imgt0
-            print('    Time to complete '+rawfile+': ',tcomp,float(len(image_data))/tcomp,'cand/sec')
+        tcomp=time.time()-imgt0
+        log.info('Time to complete '+rawfile+': ',tcomp,float(len(image_data))/tcomp,'cand/sec')
         newsql.setingestedfiles(rawfile)
+        return 'complete'
+    except:
+        return 'error'
