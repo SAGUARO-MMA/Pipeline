@@ -289,8 +289,9 @@ def action(item_list):
             q.put(logger.info(comment))
     except BaseException as e:
         q.put(logger.critical('Uncaught error occurred in ZOGY: '+str(e)))
-    if os.exists(reduced.replace('.fits','_trans.fits'):
-        status = ingestion.ingestion(reduced.replace('.fits','_trans.fits')
+    transient_catalog = reduced.replace('.fits', '_trans.fits')
+    if os.exists(transient_catalog):
+        status = ingestion.ingestion(transient_catalog, logger)
         if status=='error':
             q.put(logger.info('Failed to ingest catalog.'))
     q.put(logger.info('Cleaning up.'))
