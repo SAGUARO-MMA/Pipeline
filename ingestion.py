@@ -397,7 +397,8 @@ def ingestion(transCatalog,log):
                         mmjd=str(float(hdr['MJD'])+float(hdr['EXPTIME'])/2./86400.)
                     else:
                         mmjd=str(hdr['MJDMID'])
-                    res=newsql.ingesttargets(float(ra),float(dec),field,classification)
+                    # res=newsql.ingesttargets(float(ra),float(dec),field,classification)
+                    res = {'classification': [0], 'targetid': [0]}
                     ttingest.append(time.time()-rowt0)
 
                     cx = np.cos( np.radians(float(ra)) )*np.cos( np.radians(float(dec)))
