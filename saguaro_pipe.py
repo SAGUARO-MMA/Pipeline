@@ -4,7 +4,7 @@
 Pipeline for real-time data reduction and image subtraction.
 '''
 
-__version__ = "1.4" #last updated 10/11/2021
+__version__ = "1.5" #last updated 03/05/2022
 
 import sys
 import numpy as np
@@ -39,6 +39,7 @@ from watchdog.events import FileSystemEventHandler
 import shutil
 import fnmatch as fn
 import zogy
+import ingestion
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()
@@ -288,6 +289,10 @@ def action(item_list):
             q.put(logger.info(comment))
     except BaseException as e:
         q.put(logger.critical('Uncaught error occurred in ZOGY: '+str(e)))
+    if os.exists(reduced.replace('.fits','_trans.fits'):
+        status = ingestion.ingestion(reduced.replace('.fits','_trans.fits')
+        if status=='error':
+            q.put(logger.info('Failed to ingest catalog.'))
     q.put(logger.info('Cleaning up.'))
     cleanup(reduced,ref,unique_dir)
     os.chdir(work_path)
