@@ -102,13 +102,14 @@ def ingesttargets(ra,dec,field,classification):
     else:
         return res
 
-def updateingestcandidateswithid(number,filename,xwin,ywin,errx2win,erry2win,errxywin,elongation,ra,dec,fwhm,snr,fluxpsf,fluxpsferr,mag,magerr,rawfilename,obsdate,field,seqnum,classification,img,ref,diff,scorr,zoomimg,zoomref,zoomdiff,zoomscorr,cx,cy,cz,targetid,datemid,mjdmid,mlscore):
-    db=MyDatabase()
+def ingestcandidateswithidreturn(number,filename,elongation,ra,dec,fwhm,snr,mag,magerr,rawfilename,obsdate,field,classification,cx,cy,cz,htm16id,targetid,mjdmid,mlscore,ncomb,match):
+    db=Dictdb()
     ingestdate="'"+str(datetime.datetime.now())+"'"
-    db.query("WITH upsert AS (UPDATE candidates SET mlscore=%s WHERE candidatenumber=%s AND filename=%s returning *) INSERT INTO candidates (candidatenumber,filename,xwin,ywin,errx2win,erry2win,errxywin,elongation,ra,dec,fwhm,snr,fluxpsf,fluxpsferr, mag, magerr,rawfilename,obsdate,field,seqnum,classification, image, reference, diff, scorr,zoomimage,zoomreference,zoomdiff,zoomscorr,ingestdate, cx,cy,cz,targetid,datemid,mjdmid,mlscore) SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s, %s, %s, %s, %s,%s,%s, %s, %s, %s, %s, %s WHERE NOT EXISTS (SELECT * FROM upsert);" % (mlscore,"'"+number+"'", "'"+filename+"'","'"+number+"'", "'"+filename+"'", "'"+xwin+"'", "'"+ywin+"'", "'"+errx2win+"'", "'"+erry2win+"'", "'"+errxywin+"'", "'"+elongation+"'", "'"+ra+"'", "'"+dec+"'", "'"+fwhm+"'","'"+snr+"'", "'"+fluxpsf+"'", "'"+fluxpsferr+"'", "'"+mag+"'", "'"+magerr+"'", "'"+rawfilename+"'","'"+obsdate+"'","'"+field+"'","'"+seqnum+"'", "'"+classification+"'","'"+img+"'","'"+ref+"'","'"+diff+"'", "'"+scorr+"'", "'"+zoomimg+"'","'"+zoomref+"'","'"+zoomdiff+"'", "'"+zoomscorr+"'",ingestdate,cx,cy,cz,targetid,"'"+datemid+"'",mjdmid,mlscore))
-
+    if match ==-1:ret=db.queryfetchall("INSERT INTO candidates (candidatenumber,filename,elongation,ra,dec,fwhm,snr,mag,magerr,rawfilename,obsdate,field,classification,cx,cy,cz,htm16id,targetid,mjdmid,mlscore,ncombine) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;" % (number, "'"+filename+"'",elongation,ra,dec,fwhm,snr,mag,magerr,"'"+rawfilename+"'","'"+obsdate+"'","'"+field+"'",classification,cx,cy,cz,htm16id,targetid,mjdmid,mlscore,ncomb))
+    if match !=-1:ret=db.queryfetchall("INSERT INTO candidates (candidatenumber,filename,elongation,ra,dec,fwhm,snr,mag,magerr,rawfilename,obsdate,field,classification,cx,cy,cz,htm16id,targetid,mjdmid,mlscore,ncombine,gladeid) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;" % (number, "'"+filename+"'",elongation,ra,dec,fwhm,snr,mag,magerr,"'"+rawfilename+"'","'"+obsdate+"'","'"+field+"'",classification,cx,cy,cz,htm16id,targetid,mjdmid,mlscore,ncomb,match))
     db.commit()
     db.close()
+    return ret
 
 def setingestedfiles(filename):
     db = Dictdb()
