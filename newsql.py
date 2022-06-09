@@ -8,7 +8,7 @@ import numpy as np
 
 class MyDatabase():
     def __init__(self, db="saguaro", user="saguaro"):
-        connstring = open('/home/saguaro/software/webapptesting/test_db.conn').readline()
+        connstring = open('/home/saguaro/software/webapptesting/sassy.conn').readline()
         self.conn = psycopg2.connect(connstring)
         self.cur = self.conn.cursor()
 
@@ -47,7 +47,7 @@ class MyDatabase():
 
 class Dictdb():
     def __init__(self, db="saguaro", user="saguaro"):
-        connstring = open('/home/saguaro/software/webapptesting/test_db.conn').readline()
+        connstring = open('/home/saguaro/software/webapptesting/sassy.conn').readline()
         self.conn = psycopg2.connect(connstring)
         self.cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
