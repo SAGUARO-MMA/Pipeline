@@ -340,18 +340,18 @@ def ingestion(transCatalog,log):
                         mmjd=str(float(hdr['MJD'])+float(hdr['EXPTIME'])/2./86400.)
                     else:
                         mmjd=str(hdr['MJDMID'])
-                    # res=newsql.ingesttargets(float(ra),float(dec),field,classification)
-                    res = {'classification': [0], 'targetid': ['NULL']}
+                    res = newsql.get_or_create_target(float(ra), float(dec))
                     ttingest.append(time.time()-rowt0)
 
                     cx = np.cos( np.radians(float(ra)) )*np.cos( np.radians(float(dec)))
                     cy = np.sin( np.radians(float(ra)) )*np.cos( np.radians(float(dec)))
                     cz = np.sin( np.radians(float(dec)) )
+                    htm16ident = -1
 
                     #match=gladematch(gl,50,cx,cy,cz)
                     match=-1
                     tglade.append(time.time()-rowt0)
-                    ret=newsql.ingestcandidateswithidreturn(number,filename,elongation,ra,dec,fwhm,snr,mag,magerr,rawfilename,obsdate,field,res['classification'][0],cx,cy,cz,res['targetid'][0],mmjd,score,ncomb,match)
+                    ret=newsql.ingestcandidateswithidreturn(number,filename,elongation,ra,dec,fwhm,snr,mag,magerr,rawfilename,obsdate,field,0,cx,cy,cz,htm16ident,res['id'][0],mmjd,score,ncomb,match)
                     tcingest.append(time.time()-rowt0)
                     if not os.path.exists(pngpath):os.makedirs(pngpath)
                     visit=filename.split('_')[4]

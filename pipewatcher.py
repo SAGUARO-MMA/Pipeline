@@ -435,7 +435,7 @@ def proc(event):
                         else:
                             mmjd=str(hdr['MJDMID'])
   #                      print('ingesting.......')
-                        res=newsql.ingesttargets(float(ra),float(dec),field,classification)
+                        res = newsql.get_or_create_target(float(ra), float(dec))
                         ttingest.append(time.time()-rowt0)
                         cx,cy,cz,htm16ident=newsql.coordinateident(float(ra),float(dec),lev=16)
                         cx = np.cos( np.radians(float(ra)) )*np.cos( np.radians(float(dec)))
@@ -445,7 +445,7 @@ def proc(event):
 
                         match=gladematch(gl,50,cx,cy,cz)
                         tglade.append(time.time()-rowt0)
-                        ret=newsql.ingestcandidateswithidreturn(number,filename,elongation,ra,dec,fwhm,snr,mag,magerr,rawfilename,obsdate,field,res['classification'][0],cx,cy,cz,htm16ident,res['targetid'][0],mmjd,score,ncomb,match)
+                        ret=newsql.ingestcandidateswithidreturn(number,filename,elongation,ra,dec,fwhm,snr,mag,magerr,rawfilename,obsdate,field,0,cx,cy,cz,htm16ident,res['id'][0],mmjd,score,ncomb,match)
                         tcingest.append(time.time()-rowt0)
                         if not os.path.exists(pngpath):os.makedirs(pngpath)
                         visit=filename.split('_')[4]

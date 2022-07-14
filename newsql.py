@@ -79,28 +79,25 @@ def pipecandmatch(basefile):
     db.close()
     return files,names
 
-def ingesttargets(ra,dec,field,classification):
-    res={}
-    cx = np.cos( np.radians(ra) )*np.cos( np.radians(dec))
-    cy = np.sin( np.radians(ra) )*np.cos( np.radians(dec))
-    cz = np.sin( np.radians(dec) )
-    res=getcandidates('targets',field,ra,dec,2,cx,cy,cz)
-    if len(res)==0:
-        add=True
 
-    if len(res)>=1:
-        add=False
-        if classification == '1' or classification =='7':res['classification'][0]=classification
+def get_or_create_target(ra, dec, radius=2.):
+    db = Dictdb()
+    res = db.queryfetchall(f"SELECT * FROM tom_targets_target "
+                           f"WHERE q3c_radial_query(ra, dec, {ra:f}, {dec:f}, {radius / 3600.:f});")
 
-    if add:
-        db=Dictdb()
-        cx,cy,cz = coordinateident(ra,dec)
-        ret=db.queryfetchall("INSERT INTO targets (ra,dec,field,classification,cx,cy,cz) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING *;" % (ra, dec, "'"+field+"'",classification, cx,cy,cz))
+    if len(res) == 0:
+        res = db.queryfetchall(f"INSERT INTO tom_targets_target (name, type, created, modified, ra, dec, epoch, scheme) "
+                               f"VALUES ('unconfirmed candidate', 'SIDEREAL', NOW(), NOW(), {ra:f}, {dec:f}, 2000, '') "
+                               f"RETURNING *;")
+        targetid = res['id'][0]
+        temporary_name = f"Target {targetid:d}"
+        db.query(f"UPDATE tom_targets_target SET name='{temporary_name}' where id={targetid:d};")
+        res['name'][0] = temporary_name
         db.commit()
         db.close()
-        return ret
-    else:
-        return res
+
+    return res
+
 
 def ingestcandidateswithidreturn(number,filename,elongation,ra,dec,fwhm,snr,mag,magerr,rawfilename,obsdate,field,classification,cx,cy,cz,htm16id,targetid,mjdmid,mlscore,ncomb,match):
     db=Dictdb()
