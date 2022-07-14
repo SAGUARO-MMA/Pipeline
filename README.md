@@ -2,9 +2,9 @@
 
 The SAUARO pipeline is designed to run every night, automatically started by a cron job, to reduce incoming data.
 
-The main pipeline script is saguaro_pipe.py, and runs together with the telescope setting file (e.g. css.py for the 1.5m CSS telescope on Mt Lemmon) to reduce new data through a watchdog observer (the location of the folder with new data is define in the setting file). The pipeline will reduce the data according to the options defined in the setting file as well as creating a mask for each image.
+The main pipeline script is saguaro_pipe.py, and runs together with the telescope setting file (e.g. css.py for the 1.5 m CSS telescope on Mt Lemmon) to reduce new data through a watchdog observer (the location of the folder with new data is defined in the setting file). The pipeline will reduce the data according to the options defined in the setting file as well as creating a mask for each image.
 
-The pipeline will then look for a reference file (the location of which is define in the setting file) which it can use for subtraction using ZOGY (). If a reference image is found, the pipeline submits the relevant files as a subtraction job to ZOGY. If no reference is found, the image is submitting to ZOGY as a reference job. Once ZOGY has completed, the pipeline will move the needed files to the relevant folders. The pipeline includes a complete log of its operations, and can be run on multiple CPUs.
+The pipeline will then look for a reference file (the location of which is defined in the setting file) which it can use for subtraction using ZOGY (). If a reference image is found, the pipeline submits the relevant files as a subtraction job to ZOGY. If no reference is found, the image is submitting to ZOGY as a reference job. Once ZOGY has completed, the pipeline will move the needed files to the relevant folders. The pipeline includes a complete log of its operations, and can be run on multiple CPUs.
 
 The parameters which can be set when starting the pipeline are:
 1) telescope - the name of the setting file the pipeline will load (in the same folder)
