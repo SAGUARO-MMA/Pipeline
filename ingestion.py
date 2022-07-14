@@ -37,63 +37,7 @@ from astropy.utils.exceptions import AstropyWarning
 # from email import email_field
 
 
-def fieldcheck(field):
-    print('started field check')
-    res=gwfields()
-    gweventslist=[]
 
-    gweventslist=set(res['gwname'])
-    gwnames=res['gwname']
-    fieldstriggered1=res['fieldstriggered']
-    fieldstriggered2=res['fieldstriggered2']
-    fieldstriggered3=res['fieldstriggered3']
-    fields90=res['fields90']
-    obsdate=res['ingestdate']
-    zipped=zip(gwnames,fieldstriggered1,fieldstriggered2,fieldstriggered3,fields90,obsdate)
-
-    #Loop through all gwevents
-    #Sort list to find the most recent alert for each gwevent
-    for i in gweventslist:
-        tgw,tft1,tft2,tft3,tf90,tobs=[],[],[],[],[],[]
-        print('second forloop')
-        for a,b,c,d,e,f in zip(gwnames,fieldstriggered1,fieldstriggered2,fieldstriggered3,fields90,obsdate):
-            if a==i:
-                tgw.append(a)
-                if b!=None:
-                    tft1.append(b)
-                else:
-                    tft1.append('')
-                if c!=None:
-                    tft2.append(c)
-                else:
-                    tft2.append('')
-                if d!=None:
-                    tft3.append(d)
-                else:
-                    tft3.append('')
-                if e!=None:
-                    tf90.append(e)
-                else:
-                    tf90.append('')
-                tobs.append(f)
-
-        gwzip=zip(tgw,tft1,tft2,tft3,tf90,tobs)
-        out=sorted(gwzip,key=lambda x:[-1])[0]
-        gw,ft1,ft2,ft3,ft90,obs=out[0],out[1].split(','),out[2].split(','),out[3].split(','),out[4].split(','),out[5]
-   
-        ft_test=[x for x in [ft1,ft2,ft3] if field in x]
-        ft90_test=[x for x in [ft90] if field in x]
-
-        # if ft_test !=[]:
-        #     email_field(gw,field,trigger=True)
-        # elif ft90_test !=[]:
-        #     email_field(gw,field,trigger=False)
-
-def gwfields():
-    db = newsql.Dictdb()
-    res=db.queryfetchall("select gwname,fieldstriggered, fieldstriggered2, fieldstriggered3,fields90,ingestdate from gwevents where gwname in (select distinct gwname from gwevents where obstype='observation' and obsdate> current_timestamp- interval '5 days' and active =1) order by ingestdate desc ")
-    db.close()
-    return res
 
 def gaialist(field):
     db = newsql.Dictdb()
@@ -123,17 +67,14 @@ def movingobjectcatalog(obsmjd):
     t0 = datetime.datetime(1858, 11, 17)
     tobs = t0 + datetime.timedelta(obsmjd)
     s_full_date=tobs.strftime("%Y/%m/%d %H:%M:%S")
-    try:
-        f_catalog = file("%04i_%02i_ORB.DAT" %
-                         (tobs.year, tobs.month), "r")
-    except:
+    fnam=("%04i_%02i_ORB.DAT" %
+                         (tobs.year, tobs.month))
+    if not os.path.exists(fnam):
         os.system('wget -O MPCORB.DAT http://www.minorplanetcenter.org/iau/MPCORB/MPCORB.DAT')
         os.system('python MPCORB2MonthlyCatalog.py')
-        f_catalog = file("%04i_%02i_ORB.DAT" %
-                         (tobs.year, tobs.month), "r")
-
-    for line in f_catalog:
-        catalog_list.append(line.rstrip())
+    with open("%04i_%02i_ORB.DAT" % (tobs.year, tobs.month)) as f_catalog:
+        for line in f_catalog:
+            catalog_list.append(line.rstrip())
     f_catalog.close()
     s_catalog=catalog_list
     return s_catalog
@@ -289,42 +230,39 @@ def imgscale(data):
 
 
 def ingestion(transCatalog,log):
-    log.info('Ingesting catalog.')
-    try:
-        ml_model = 'rf_model.ml'
-        log.info('Loading ML model: '+ml_model)
-        classifier = pickle.load(open(ml_model, 'rb'))
-    except:
-        log.error('Error loading ML model.')
-        return 'error'
-    if 'trans.fits' not in transCatalog:
-        log.error(transCatalog+' is not a transient catalog file.')
-        return 'error'
-    try:
+    log=None
+    if log !=None:log.info('Ingesting catalog.')
+    ml_model = '/home/saguaro/software/lundquist/rf_model.ml'
+    print('Loading classifier\n')
+    classifier = pickle.load(open(ml_model, 'rb'))
+    print('Classifier loaded\n')
+    if True:
         imgt0=time.time()
         hdul=fits.open(transCatalog)
         hdul.info()
         hdr=hdul[1].header
         image_data=hdul[1].data
-        log.info(str(len(image_data))+' candidates found.')
+        if log !=None:log.info(str(len(image_data))+' candidates found.')
+        print(str(len(image_data))+' candidates found.')
         rawfile=transCatalog.replace('_red_trans.fits','.arch')
         pngpath_main='/home/saguaro/data/png/'+transCatalog[4:8]+'/'+transCatalog[8:10]+'/'+transCatalog[10:12]
         tfile=time.time()-imgt0
-        resfile,resnumber=newsql.pipecandmatch(transCatalog)
+        resfile,resnumber=newsql.pipecandmatch(os.path.basename(transCatalog))
         tpipecand=time.time()-imgt0
         tpng,tpng2,tml,ttingest,tcingest,tglade,tmobjmatch,tgmatch,tpngsave=[],[],[],[],[],[],[],[],[]
         field=str(hdr['OBJECT'])
+        print(resfile,len(resfile),len(image_data))
         if len(resfile) == 0 or len(resfile) < len(image_data):
             
             ####  Moving Object Classification  ####'
-            catalog=movingobjectcatalog(float(hdr['MJD']))
+        #    catalog=movingobjectcatalog(float(hdr['MJD']))
             ra,dec=radectodecimal(hdr['RA'],hdr['DEC'])
-            filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
+        #    filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
             tmobj=time.time()-imgt0
-            gl=gladelist(str(hdr['OBJECT']))
+            #gl=gladelist(str(hdr['OBJECT']))
 
             ###gaia stars in field###
-            gaiadict=gaialist(field)
+            #gaiadict=gaialist(field)
 
             tggrab=time.time()-imgt0
             tpng,tml,ttingest,tcingest,tglade,tmobjmatch,tgmatch=[],[],[],[],[],[],[]
@@ -333,7 +271,8 @@ def ingestion(transCatalog,log):
                 rowt0=time.time()
                 pngpath=pngpath_main+'/'+str(hdr['OBJECT'])
 
-                if str(row[0]) not in resnumber and float(row[9]) > 0.0:
+                print(row[0],resnumber)
+                if str(row[0]) not in resnumber:
                     if np.mean(row[15])!=0: data=imgscale(row[15])
                     if np.mean(row[15])==0: data=row[15]
                     img = Image.fromarray(data)
@@ -355,7 +294,10 @@ def ingestion(transCatalog,log):
                     msize=10
                     mldata=data[int(asize/2-msize/2):int(asize/2+msize/2),int(asize/2-msize/2):int(asize/2+msize/2)]
                     mldata=( (mldata/np.nanmean(mldata))*np.log(1+(np.nanmean(mldata)/np.nanstd(mldata))) )
-                    score=(classifier.predict_proba(mldata.reshape((1, -1))))[0][1]
+                    try:
+                        score=(classifier.predict_proba(mldata.reshape((1, -1))))[0][1]
+                    except:
+                        score=0
 
                     tml.append(time.time()-rowt0)
                     if np.mean(row[18])!=0: data=imgscale(row[18])
@@ -366,17 +308,18 @@ def ingestion(transCatalog,log):
                     tpng2.append((time.time()-rowt0))
 
                 ####  Moving Object Classification  ####
-                    mvobj=movingobjectmatch(filtered_catalog,float(row[7]),float(row[8]), float(hdr['MJD']), 25.0)
-                    if len(mvobj)==0:
-                        classification='0'
-                    else:
-                        classification='1'
-
+                 #   mvobj=movingobjectmatch(filtered_catalog,float(row[7]),float(row[8]), float(hdr['MJD']), 25.0)
+                  #  if len(mvobj)==0:
+                  #      classification='0'
+                  #  else:
+                  #      classification='1'
+                    classification='0'
                     tmobjmatch.append(time.time()-rowt0)
 
                 ####  Previously detected object search  ####
 
-                    gmatch=gaiamatch(gaiadict,0.5,[float(row[7])],[float(row[8])])
+                    #gmatch=gaiamatch(gaiadict,0.5,[float(row[7])],[float(row[8])])
+                    gmatch=False
                     if gmatch == True:
                         classification='7'
                     else:
@@ -384,7 +327,7 @@ def ingestion(transCatalog,log):
 
                     tgmatch.append(time.time()-rowt0)
 
-
+                    basefile=os.path.basename(transCatalog)
                     if len(row)==19:number,filename,xwin,ywin,errx2win,erry2win,errxywin,elongation,ra,dec,fwhm,snr,fluxpsf,fluxpsferr,mag,magerr,rawfilename,obsdate,field,seqnum,ncomb=str(row[0]),str(basefile),str(row[1]),str(row[2]),str(row[3]),str(row[4]),str(row[5]),str(row[6]),str(row[7]),str(row[8]),str(row[9]),str(row[10]),str(row[11]),str(row[12]),str(row[13]),str(row[14]),str(rawfile),str(hdr['DATE-OBS']),str(hdr['OBJECT']),str(hdr['SEQNUM']),str(hdr['NCOMBINE'])
 
 
@@ -405,7 +348,8 @@ def ingestion(transCatalog,log):
                     cz = np.sin( np.radians(float(dec)) )
                     htm16ident = -1
 
-                    match=gladematch(gl,50,cx,cy,cz)
+                    #match=gladematch(gl,50,cx,cy,cz)
+                    match=-1
                     tglade.append(time.time()-rowt0)
                     ret=newsql.ingestcandidateswithidreturn(number,filename,elongation,ra,dec,fwhm,snr,mag,magerr,rawfilename,obsdate,field,0,cx,cy,cz,htm16ident,res['id'][0],mmjd,score,ncomb,match)
                     tcingest.append(time.time()-rowt0)
@@ -417,10 +361,7 @@ def ingestion(transCatalog,log):
                     scorr.save(pngpath+'/'+str(row[0])+'_'+visit+'_scorr.png',"PNG")
                     tpngsave.append(time.time()-rowt0)
 
-            fieldcheck(field)
         tcomp=time.time()-imgt0
-        log.info('Time to complete '+rawfile+': ',tcomp,float(len(image_data))/tcomp,'cand/sec')
-        newsql.setingestedfiles(rawfile)
-        return 'complete'
-    except:
-        return 'error'
+        if log!=None:log.info('Time to complete '+rawfile+': ',tcomp,float(len(image_data))/tcomp,'cand/sec')
+#        newsql.setingestedfiles(rawfile)
+        return 

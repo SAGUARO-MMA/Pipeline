@@ -30,6 +30,7 @@ from slack.errors import SlackApiError
 import gc
 import logging
 import uuid
+import traceback
 try:
     from StringIO import StringIO
 except ImportError:
@@ -55,12 +56,15 @@ def cleanup(file,ref,unique_dir):
     '''
     Moves relevant files from the tmp directory to the output path.
     '''
+    os.chdir(unique_dir)
     with fits.open(file) as hdr:
         header = hdr[0].header
     fieldID = tel.fieldID(header)
+    print('fieldID: ',fieldID)
+    print(write_path+red_path)
     if ref:
         cp_dir = write_path+red_path
-        cp_files = ['_wcs.fits','_mask.fits','_trans.fits','_Scorr.fits','.log']
+        cp_files = ['_wcs.fits','_mask.fits','_trans.fits','_Scorr.fits']
     else:
         file = fieldID
         cp_dir = write_path+'ref/'+fieldID+'/'
@@ -69,7 +73,11 @@ def cleanup(file,ref,unique_dir):
     for ext in cp_files:
         f = file.replace('.fits','')+ext
         if '.fits' in ext:
+            print(f)
             f = fpack_file(f)
+            print(f)
+#        q.put(logger.info('mv ',f,' ',cp_dir))  ##didn't pass logger?
+        print(['mv',f,cp_dir])
         subprocess.call(['mv',f,cp_dir])
     extra = glob.glob(file.replace('.fits','')+'*.pdf')
     extra += glob.glob(file.replace('.fits','')+'*.reg')
@@ -80,7 +88,14 @@ def fpack_file(file):
     '''
     Fpack file and return new name.
     '''
-    subprocess.call(['fpack','-D','-Y','-g','-q','0',file])
+    print(['fpack','-D','-Y','-g','-q','0',file])
+    try:
+        if os.path.exists(file):
+            subprocess.call(['fpack','-D','-Y','-g','-q','0',file])
+        else:
+            print(file," doesn't exist")
+    except:
+        print('fpack failed')
     return file.replace('.fits','.fits.fz')
 
 def funpack_file(file):
@@ -260,7 +275,7 @@ def action(item_list):
         q.put(logger.info('Found new file '+file))
     except AttributeError: #if event is a file
         file = event
-        q.put(logger.info('Found old file '+file))
+        q.put(logger.info('MJL - Found old file '+file))
     if fn.fnmatch(os.path.basename(file),file_name): #only continue if the file matches the expected file name
         copying(file) #check to see if write is finished writing
     else:
@@ -272,9 +287,13 @@ def action(item_list):
     q.put(logger.info(comment))
     ref = tel.find_ref(reduced) #find refernece image
     subprocess.call(['cp','-r',zogy_path+'/'+C.cfg_dir,'.']) #copy over needed zogy config files
+    q.put(logger.info('@@@@@@'))
+    print('cp','-r',zogy_path+'/'+C.cfg_dir,'.')
+    print('@@@')
     try:
         if ref: #submit as subtraction job
-            q.put(logger.info("Reference found."))
+            q.put(logger.info("ML Reference found!."))
+            q.put(logger.info(reduced))
             status, comment = zogy.optimal_subtraction(new_fits=reduced,
             ref_fits=ref,
             new_fits_mask=reduced.replace('.fits','_mask.fits'),
@@ -289,12 +308,30 @@ def action(item_list):
             q.put(logger.info(comment))
     except BaseException as e:
         q.put(logger.critical('Uncaught error occurred in ZOGY: '+str(e)))
+        q.put(logger.critical(traceback(e)))
     transient_catalog = reduced.replace('.fits', '_trans.fits')
-    if os.exists(transient_catalog):
-        status = ingestion.ingestion(transient_catalog, logger)
-        if status=='error':
-            q.put(logger.info('Failed to ingest catalog.'))
+    print('@@@@')
+    print(reduced)
+    print(transient_catalog)
+    print(unique_dir+'/'+transient_catalog)
+    print(os.path.exists(unique_dir+'/'+transient_catalog))
+    q.put(logger.info(unique_dir+'/'+transient_catalog))
+    if os.path.exists(unique_dir+'/'+transient_catalog): 
+        print('Starting ingestion')
+        try:
+            ingestion.ingestion(unique_dir+'/'+transient_catalog, None)
+        except BaseException as e:
+            print('ingestion failed')
+            print(str(e))
+        print('End ingestion')
+#        if status=='error':
+#            q.put(logger.info('Failed to ingest catalog.'))
+    else:
+        print('Failed to find transient catalog')
+    print('Cleaning up.!')
     q.put(logger.info('Cleaning up.'))
+    q.put(logger.info(reduced+' '+ref+' '+unique_dir))
+    print(reduced,ref,unique_dir)
     cleanup(reduced,ref,unique_dir)
     os.chdir(work_path)
     subprocess.call(['rm','-r',unique_dir])
