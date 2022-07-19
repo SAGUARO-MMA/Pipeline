@@ -1,6 +1,8 @@
 import psycopg2
 import psycopg2.extras
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
+import json
 
 
 class Dictdb:
@@ -65,5 +67,9 @@ def ingestcandidates(number, filename, elongation, ra, dec, fwhm, snr, mag, mage
              f"VALUES ({number}, '{filename}', {elongation}, {ra}, {dec}, {fwhm}, {snr}, {mag}, {magerr}, "
              f"'{rawfilename}', '{obsdate}', '{field}', {classification}, {cx}, {cy}, {cz}, {htm16id}, {targetid}, "
              f"{mjdmid}, {mlscore}, {ncomb}) RETURNING id;")
+    reduced_datum_value = {'magnitude': mag, 'error': magerr, 'filter': 'Clear', 'instrument': 'CSS'}
+    db.query(f"INSERT INTO tom_dataproducts_reduceddatum (data_type, source_name, source_location, timestamp, value, "
+             f"target_id) VALUES ('photometry', 'SAGUARO pipeline', 'SAGUARO pipeline', "
+             f"'{Time(mjdmid, format='mjd').iso}', '{json.dumps(reduced_datum_value)}', {targetid:d})")
     db.commit()
     db.close()
