@@ -140,8 +140,9 @@ def ingestion(transCatalog, log):
         log.info(str(len(image_data)) + ' candidates found.')
     print(str(len(image_data)) + ' candidates found.')
     rawfile = transCatalog.replace('_red_trans.fits', '.arch')
-    pngpath_main = f'/home/saguaro/data/png/{transCatalog[4:8]}/{transCatalog[8:10]}/{transCatalog[10:12]}'
-    resfile, resnumber = newsql.pipecandmatch(os.path.basename(transCatalog))
+    basefile = os.path.basename(transCatalog)
+    pngpath_main = f'/home/saguaro/data/png/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
+    resfile, resnumber = newsql.pipecandmatch(basefile)
     tpng, tpng2, tml, ttingest, tcingest, tglade, tmobjmatch, tgmatch, tpngsave = [], [], [], [], [], [], [], [], []
     print(resfile, len(resfile), len(image_data))
     if len(resfile) == 0 or len(resfile) < len(image_data):
@@ -211,7 +212,6 @@ def ingestion(transCatalog, log):
                 # Previously detected object search
                 tgmatch.append(time.time() - rowt0)
 
-                basefile = os.path.basename(transCatalog)
                 number = str(row[0])
                 filename = str(basefile)
                 elongation = str(row[6])
