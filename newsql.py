@@ -1,5 +1,6 @@
 import psycopg2
 import psycopg2.extras
+from astropy.coordinates import SkyCoord
 
 
 class Dictdb:
@@ -44,13 +45,12 @@ def get_or_create_target(ra, dec, radius=2.):
                            f"WHERE q3c_radial_query(ra, dec, {ra:f}, {dec:f}, {radius / 3600.:f});")
 
     if len(res) == 0:
+        coord = SkyCoord(ra, dec, unit='deg')
+        temp_name = f"J{coord.ra.to_string('hourangle', sep='', precision=2, pad=True)}" \
+                    f"{coord.dec.to_string('deg', sep='', precision=1, pad=True, alwayssign=True)}".replace('.', '')
         res = db.queryfetchall(f"INSERT INTO tom_targets_target (name, type, created, modified, ra, dec, epoch, scheme)"
-                               f" VALUES ('unconfirmed candidate', 'SIDEREAL', NOW(), NOW(), {ra:f}, {dec:f}, 2000, '')"
+                               f" VALUES ('{temp_name}', 'SIDEREAL', NOW(), NOW(), {ra:f}, {dec:f}, 2000, '')"
                                f" RETURNING *;")
-        targetid = res['id'][0]
-        temporary_name = f"Target {targetid:d}"
-        db.query(f"UPDATE tom_targets_target SET name='{temporary_name}' where id={targetid:d};")
-        res['name'][0] = temporary_name
         db.commit()
         db.close()
 
