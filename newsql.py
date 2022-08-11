@@ -51,6 +51,9 @@ def get_or_create_target(ra, dec, radius=2.):
         res = db.queryfetchall(f"INSERT INTO tom_targets_target (name, type, created, modified, ra, dec, epoch, scheme)"
                                f" VALUES ('{temp_name}', 'SIDEREAL', NOW(), NOW(), {ra:f}, {dec:f}, 2000, '')"
                                f" RETURNING *;")
+        for permission_id in [55, 56, 57]:  # view, change, delete
+            db.query(f"INSERT INTO guardian_groupobjectpermission (object_pk, content_type_id, group_id, permission_id)"
+                     f"VALUES ({res['id'][0]}, 14, 1, {permission_id})")  # give permissions to the "public" group (1)
         db.commit()
         db.close()
 
