@@ -327,9 +327,9 @@ def action(item_list):
         try:
             ingestion.ingestion(unique_dir + '/' + transient_catalog, logger)
         except BaseException as e:
-            q.put(logger.error('Ingestion failed  for '+reduced+' - '+str(e))
+            q.put(logger.error('Ingestion failed  for '+reduced+' - '+str(e)))
             #q.put(logger.error(e))
-        q.put(logger.info('End ingestion for '+reduced)
+        q.put(logger.info('End ingestion for '+reduced))
     else:
         q.put(logger.error('Failed to find transient catalog for '+reduced))
     q.put(logger.info('Starting cleanup for '+reduced))
