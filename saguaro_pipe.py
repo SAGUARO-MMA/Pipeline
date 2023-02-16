@@ -155,7 +155,7 @@ def scheduled_exit(date, telescope):
     scheduled start time, return True. Otherwise return False.
     """
     tel = importlib.import_module(telescope)
-    if (date + datetime.timedelta(hours=tel.time_zone())).hour == 7:
+    if (date + datetime.timedelta(hours=tel.time_zone())).hour == 8:
         # if current is after scheduled exit but before next run, exit
         return True
     else:
@@ -288,7 +288,7 @@ def action(item_list):
         q.put(logger.info('Found new file ' + file))
     except AttributeError:  # if event is a file
         file = event
-        q.put(logger.info('MJL - Found old file ' + file))
+        q.put(logger.info('Found old file ' + file))
     if fn.fnmatch(os.path.basename(file), file_name):  # only continue if the file matches the expected file name
         copying(file)  # check to see if write is finished writing
     else:
@@ -296,54 +296,47 @@ def action(item_list):
     unique_dir = work_path + '/' + uuid.uuid1().hex  # create a unique tmp directoty to work in
     os.mkdir(unique_dir)
     os.chdir(unique_dir)
+    q.put(logger.info('Starting reduction for '+file))
     reduced, comment = tel.science_process(file, unique_dir, log_file_name)  # submit image for reduction
-    q.put(logger.info(comment))
-    ref = tel.find_ref(reduced)  # find refernece image
+    q.put(logger.info('Ending reduction for '+file+' '+comment))
+    ref = tel.find_ref(reduced)  # find reference image
     subprocess.call(['cp', '-r', zogy_path + '/' + C.cfg_dir, '.'])  # copy over needed zogy config files
-    q.put(logger.info('@@@@@@'))
-    print('cp', '-r', zogy_path + '/' + C.cfg_dir, '.')
-    print('@@@')
+    q.put(logger.info('cp -r '+zogy_path+'/'+C.cfg_dir+' .'))
     try:
         if ref:  # submit as subtraction job
-            q.put(logger.info("ML Reference found!."))
-            q.put(logger.info(reduced))
+            q.put(logger.info("Reference found. Starting zogy subtraction for "+reduced))
             status, comment = zogy.optimal_subtraction(new_fits=reduced,
                                                        ref_fits=ref,
                                                        new_fits_mask=reduced.replace('.fits', '_mask.fits'),
                                                        ref_fits_mask=ref.replace('_wcs.fits', '_mask.fits'),
                                                        telescope=telescope, log=logger, nthread=2)
         else:  # submit image to create reference
-            q.put(logger.info('No reference found.'))
+            q.put(logger.info("No reference found. Starting zogy reference creation for "+reduced))
             status, comment = zogy.optimal_subtraction(ref_fits=reduced,
                                                        ref_fits_mask=reduced.replace('.fits', '_mask.fits'),
                                                        telescope=telescope, log=logger, nthread=2)
         if status == 'info':
-            q.put(logger.info(comment))
+            q.put(logger.info('ZOGY comment: '+comment))
     except BaseException as e:
-        q.put(logger.critical('Uncaught error occurred in ZOGY: ' + str(e)))
+        q.put(logger.critical('Uncaught error occurred in ZOGY: '+reduced+' - ' + str(e)))
         q.put(logger.critical(traceback(e)))
     transient_catalog = reduced.replace('.fits', '_trans.fits')
-    print('@@@@')
-    print(reduced)
-    print(transient_catalog)
-    print(unique_dir + '/' + transient_catalog)
-    print(os.path.exists(unique_dir + '/' + transient_catalog))
     q.put(logger.info(unique_dir + '/' + transient_catalog))
     if os.path.exists(unique_dir + '/' + transient_catalog):
-        print('Starting ingestion')
+        q.put(logger.info('Starting ingestion for '+reduced))
         try:
-            ingestion.ingestion(unique_dir + '/' + transient_catalog, None)
+            ingestion.ingestion(unique_dir + '/' + transient_catalog, logger)
         except BaseException as e:
-            print('ingestion failed')
-            print(str(e))
-        print('End ingestion')
+            q.put(logger.error('Ingestion failed  for '+reduced+' - '+str(e))
+            #q.put(logger.error(e))
+        q.put(logger.info('End ingestion for '+reduced)
     else:
-        print('Failed to find transient catalog')
-    print('Cleaning up.!')
-    q.put(logger.info('Cleaning up.'))
+        q.put(logger.error('Failed to find transient catalog for '+reduced))
+    q.put(logger.info('Starting cleanup for '+reduced))
     q.put(logger.info(reduced + ' ' + ref + ' ' + unique_dir))
-    print(reduced, ref, unique_dir)
+    #print(reduced, ref, unique_dir)
     cleanup(reduced, ref, unique_dir)
+    q.put(logger.info('End cleanup for '+reduced))
     os.chdir(work_path)
     subprocess.call(['rm', '-r', unique_dir])
 
@@ -382,6 +375,7 @@ def main(telescope=None, date=None, cpu=None):
         C = importlib.import_module('Settings.Constants_' + telescope)
     except ImportError:
         print('No such telescope file, please check that the file is in the same directory as the pipeline.')
+#        q.put(logger.error('No such telescope file, please check that the file is in the same directory as the pipeline.'))
 
     tel_zone = tel.tel_zone()
     tel_delta = tel.tel_delta()

@@ -123,8 +123,7 @@ def imgscale(data):
     return data
 
 
-def ingestion(transCatalog, log):
-    log = None
+def ingestion(transCatalog, log=None):
     if log is not None:
         log.info('Ingesting catalog.')
     ml_model = '/home/saguaro/software/lundquist/rf_model.ml'
@@ -137,27 +136,34 @@ def ingestion(transCatalog, log):
     hdr = hdul[1].header
     image_data = hdul[1].data
     if log is not None:
-        log.info(str(len(image_data)) + ' candidates found.')
+        log.info('Ingestion: '+str(len(image_data)) + ' candidates found.')
     print(str(len(image_data)) + ' candidates found.')
     rawfile = transCatalog.replace('_red_trans.fits', '.arch')
     basefile = os.path.basename(transCatalog)
     pngpath_main = f'/home/saguaro/data/png/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
     resfile, resnumber = newsql.pipecandmatch(basefile)
-    tpng, tpng2, tml, ttingest, tcingest, tglade, tmobjmatch, tgmatch, tpngsave = [], [], [], [], [], [], [], [], []
+    tpng, tml, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], [], []
     print(resfile, len(resfile), len(image_data))
     if len(resfile) == 0 or len(resfile) < len(image_data):
 
         # Moving Object Classification
         #    catalog=movingobjectcatalog(float(hdr['MJD']))
-        ra, dec = radectodecimal(hdr['RA'], hdr['DEC'])
+        #    ra, dec = radectodecimal(hdr['RA'], hdr['DEC'])
         #    filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
 
-        tpng, tml, ttingest, tcingest, tglade, tmobjmatch, tgmatch = [], [], [], [], [], [], []
+        if 'MJDMID' not in hdr:
+            mmjd = hdr['MJD'] + hdr['EXPTIME'] / 2. / 86400.
+        else:
+            mmjd = hdr['MJDMID']
+
+        pngpath = f"{pngpath_main}/{hdr['OBJECT']}"
+        os.makedirs(pngpath, exist_ok=True)
+
+        tpng, tml, ttingest, tcingest, tmobjmatch = [], [], [], [], []
         for row in image_data:
             rowt0 = time.time()
-            pngpath = pngpath_main + '/' + str(hdr['OBJECT'])
 
-            print(row[0], resnumber)
+        #    print(row[0], resnumber)
             if str(row[0]) not in resnumber:
                 if np.mean(row[15]) != 0:
                     data = imgscale(row[15])
@@ -180,7 +186,21 @@ def ingestion(transCatalog, log):
                 diff = Image.fromarray(data)
                 diff = diff.convert('L')
 
+                if np.mean(row[18]) != 0:
+                    data = imgscale(row[18])
+                else:
+                    data = row[18]
+                scorr = Image.fromarray(data)
+                scorr = scorr.convert('L')
                 tpng.append((time.time() - rowt0))
+
+                visit = basefile.split('_')[4]
+                img.save(f"{pngpath}/{row['NUMBER']}_{visit}_img.png")
+                ref.save(f"{pngpath}/{row['NUMBER']}_{visit}_ref.png")
+                diff.save(f"{pngpath}/{row['NUMBER']}_{visit}_diff.png")
+                scorr.save(f"{pngpath}/{row['NUMBER']}_{visit}_scorr.png")
+                tpngsave.append(time.time() - rowt0)
+
                 asize = 64
                 msize = 10
                 mldata = data[int(asize / 2 - msize / 2):int(asize / 2 + msize / 2),
@@ -192,14 +212,6 @@ def ingestion(transCatalog, log):
                     score = 0
 
                 tml.append(time.time() - rowt0)
-                if np.mean(row[18]) != 0:
-                    data = imgscale(row[18])
-                else:
-                    data = row[18]
-                scorr = Image.fromarray(data)
-                scorr = scorr.convert('L')
-
-                tpng2.append((time.time() - rowt0))
 
                 # Moving Object Classification
                 #   mvobj=movingobjectfilter(filtered_catalog,float(row[7]),float(row[8]), float(hdr['MJD']), 25.0)
@@ -207,49 +219,25 @@ def ingestion(transCatalog, log):
                 #      classification='0'
                 #  else:
                 #      classification='1'
-                tmobjmatch.append(time.time() - rowt0)
+#                tmobjmatch.append(time.time() - rowt0)
 
-                # Previously detected object search
-                tgmatch.append(time.time() - rowt0)
 
-                number = str(row[0])
-                filename = str(basefile)
-                elongation = str(row[6])
-                ra = str(row[7])
-                dec = str(row[8])
-                fwhm = str(row[9])
-                snr = str(row[10])
-                mag = str(row[13])
-                magerr = str(row[14])
-                rawfilename = str(rawfile)
-                obsdate = str(hdr['DATE-OBS'])
-                field = str(hdr['OBJECT'])
-                ncomb = str(hdr['NCOMBINE'])
-
-                if 'MJDMID' not in hdr:
-                    mmjd = str(float(hdr['MJD']) + float(hdr['EXPTIME']) / 2. / 86400.)
-                else:
-                    mmjd = str(hdr['MJDMID'])
-                res = newsql.get_or_create_target(float(ra), float(dec))
+                ra = row['ALPHAWIN_J2000']
+                dec = row['DELTAWIN_J2000']
+                res = newsql.get_or_create_target(ra, dec)
                 ttingest.append(time.time() - rowt0)
 
-                cx = np.cos(np.radians(float(ra))) * np.cos(np.radians(float(dec)))
-                cy = np.sin(np.radians(float(ra))) * np.cos(np.radians(float(dec)))
-                cz = np.sin(np.radians(float(dec)))
-                htm16ident = -1
+                cx = np.cos(np.radians(ra)) * np.cos(np.radians(dec))
+                cy = np.sin(np.radians(ra)) * np.cos(np.radians(dec))
+                cz = np.sin(np.radians(dec))
 
-                tglade.append(time.time() - rowt0)
-                newsql.ingestcandidates(number, filename, elongation, ra, dec, fwhm, snr, mag, magerr, rawfilename,
-                                        obsdate, field, 0, cx, cy, cz, htm16ident, res['id'][0], mmjd, score, ncomb)
+                newsql.ingestcandidates(row['NUMBER'], basefile, row['ELONGATION'], ra, dec, row['FWHM_TRANS'],
+                                        row['S2N'], row['MAG_PSF'], row['MAGERR_PSF'], rawfile, hdr['DATE-OBS'],
+                                        hdr['OBJECT'], 0, cx, cy, cz, -1, res['id'][0], mmjd, score, hdr['NCOMBINE'])
                 tcingest.append(time.time() - rowt0)
-                os.makedirs(pngpath, exist_ok=True)
-                visit = filename.split('_')[4]
-                img.save(pngpath + '/' + str(row[0]) + '_' + visit + '_img.png', "PNG")
-                ref.save(pngpath + '/' + str(row[0]) + '_' + visit + '_ref.png', "PNG")
-                diff.save(pngpath + '/' + str(row[0]) + '_' + visit + '_diff.png', "PNG")
-                scorr.save(pngpath + '/' + str(row[0]) + '_' + visit + '_scorr.png', "PNG")
-                tpngsave.append(time.time() - rowt0)
 
     tcomp = time.time() - imgt0
     if log is not None:
-        log.info('Time to complete ' + rawfile + ': ', tcomp, len(image_data) / tcomp, 'cand/sec')
+        log.info('Ingestion: '+rawfile+'  Average time to make png, save png, run ml, target ingest,candidateingest,total candidates,'+ str(np.mean(tpng))+','+str(np.mean(tpngsave))+','+str(np.mean(tml))+','+str(np.mean(ttingest))+','+str(np.mean(tcingest))+','+str(len(tpng)))
+        log.info('Ingestion:  Time to complete ' + rawfile + ': '+str(tcomp)+' '+str(len(image_data) / tcomp)+' cand/sec')
+
