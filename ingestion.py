@@ -11,6 +11,9 @@ import numpy as np
 
 import newsql
 
+import tensorflow as tf
+from tensorflow.keras import models
+
 
 def movingobjectcatalog(obsmjd):
     catalog_list = []
@@ -111,16 +114,16 @@ def imgscale(data):
     span = 4 * sig
     # scale the data to the requested display values
     # greys
-    data -= zero
-    data *= (depth - 1) / span
+    new_data = data - zero
+    new_data *= (depth - 1) / span
     # black
-    w = data < 0
-    data[w] = 0
+    w = new_data < 0
+    new_data[w] = 0
     # white
-    w = data > (depth - 1)
-    data[w] = (depth - 1)
-    data = data + (256 - depth)
-    return data
+    w = new_data > (depth - 1)
+    new_data[w] = (depth - 1)
+    new_data = new_data + (256 - depth)
+    return new_data
 
 
 def ingestion(transCatalog, log=None):
@@ -130,6 +133,10 @@ def ingestion(transCatalog, log=None):
     print('Loading classifier\n')
     classifier = pickle.load(open(ml_model, 'rb'))
     print('Classifier loaded\n')
+    print('Loading NN classifier\n')
+    model = models.load_model('/home/saguaro/software/Pipeline/model_onlyscorr16_ml',compile=False)
+    model.compile(optimizer='Adam',metrics=['accuracy'],loss='binary_crossentropy')
+    print('NN classifer loaded\n')
     imgt0 = time.time()
     hdul = fits.open(transCatalog)
     hdul.info()
@@ -142,7 +149,7 @@ def ingestion(transCatalog, log=None):
     basefile = os.path.basename(transCatalog)
     pngpath_main = f'/home/saguaro/data/png/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
     resfile, resnumber = newsql.pipecandmatch(basefile)
-    tpng, tml, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], [], []
+    tpng, tml, tml_nn, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], [], [], []
     print(resfile, len(resfile), len(image_data))
     if len(resfile) == 0 or len(resfile) < len(image_data):
 
@@ -179,6 +186,7 @@ def ingestion(transCatalog, log=None):
                 ref = Image.fromarray(data)
                 ref = ref.convert('L')
 
+                diff_data = row[17]
                 if np.mean(row[17]) != 0:
                     data = imgscale(row[17])
                 else:
@@ -186,6 +194,7 @@ def ingestion(transCatalog, log=None):
                 diff = Image.fromarray(data)
                 diff = diff.convert('L')
 
+                scorr_data = row[18][24:40,24:40]
                 if np.mean(row[18]) != 0:
                     data = imgscale(row[18])
                 else:
@@ -203,7 +212,7 @@ def ingestion(transCatalog, log=None):
 
                 asize = 64
                 msize = 10
-                mldata = data[int(asize / 2 - msize / 2):int(asize / 2 + msize / 2),
+                mldata = diff_data[int(asize / 2 - msize / 2):int(asize / 2 + msize / 2),
                               int(asize / 2 - msize / 2):int(asize / 2 + msize / 2)]
                 mldata = ((mldata / np.nanmean(mldata)) * np.log(1 + (np.nanmean(mldata) / np.nanstd(mldata))))
                 try:
@@ -221,6 +230,10 @@ def ingestion(transCatalog, log=None):
                     classification='1'
 #                tmobjmatch.append(time.time() - rowt0)
 
+                tml_nn_start = time.time()
+                
+                score_bogus, score_real = model.predict(scorr_data[None])[0]
+                tml_nn.append(time.time() - tml_nn_start)
 
                 ra = row['ALPHAWIN_J2000']
                 dec = row['DELTAWIN_J2000']
@@ -233,11 +246,10 @@ def ingestion(transCatalog, log=None):
 
                 newsql.ingestcandidates(row['NUMBER'], basefile, row['ELONGATION'], ra, dec, row['FWHM_TRANS'],
                                         row['S2N'], row['MAG_PSF'], row['MAGERR_PSF'], rawfile, hdr['DATE-OBS'],
-                                        hdr['OBJECT'], 0, cx, cy, cz, -1, res['id'][0], mmjd, score, hdr['NCOMBINE'])
+                                        hdr['OBJECT'], 0, cx, cy, cz, -1, res['id'][0], mmjd, score, score_bogus, score_real, hdr['NCOMBINE'])
                 tcingest.append(time.time() - rowt0)
 
     tcomp = time.time() - imgt0
     if log is not None:
-        log.info('Ingestion: '+rawfile+'  Average time to make png, save png, run ml, target ingest,candidateingest,total candidates,'+ str(np.mean(tpng))+','+str(np.mean(tpngsave))+','+str(np.mean(tml))+','+str(np.mean(ttingest))+','+str(np.mean(tcingest))+','+str(len(tpng)))
-        log.info('Ingestion:  Time to complete ' + rawfile + ': '+str(tcomp)+' '+str(len(image_data) / tcomp)+' cand/sec')
-
+        log.info('Ingestion: '+rawfile+'  Average time to make png, save png, run ml, target ingest,candidateingest,total candidates,'+ str(np.mean(tpng))+','+str(np.mean(tpngsave))+','+str(np.mean(tml))+','+str(np.mean(tml_nn))+','+str(np.mean(ttingest))+','+str(np.mean(tcingest))+','+str(len(tpng)))
+        log.info('Ingestion: Time to complete ' + rawfile + ': '+str(tcomp)+' '+str(len(image_data) / tcomp)+' cand/sec')

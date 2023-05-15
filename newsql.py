@@ -63,14 +63,15 @@ def get_or_create_target(ra, dec, radius=2.):
 
 
 def ingestcandidates(number, filename, elongation, ra, dec, fwhm, snr, mag, magerr, rawfilename, obsdate, field,
-                     classification, cx, cy, cz, htm16id, targetid, mjdmid, mlscore, ncomb):
+                     classification, cx, cy, cz, htm16id, targetid, mjdmid, mlscore, mlbogus, mlreal, ncomb):
     db = Dictdb()
     db.query(f"INSERT INTO candidates (candidatenumber, filename, elongation, ra, dec, fwhm, snr, mag, magerr, "
-             f"rawfilename, obsdate, field, classification, cx, cy, cz, htm16id, targetid, mjdmid, mlscore, ncombine) "
+             f"rawfilename, obsdate, field, classification, cx, cy, cz, htm16id, targetid, mjdmid, mlscore, mlscore_bogus, mlscore_real, ncombine) "
              f"VALUES ({number}, '{filename}', {elongation}, {ra}, {dec}, {fwhm}, {snr}, {mag}, {magerr}, "
              f"'{rawfilename}', '{obsdate}', '{field}', {classification}, {cx}, {cy}, {cz}, {htm16id}, {targetid}, "
-             f"{mjdmid}, {mlscore}, {ncomb}) RETURNING id;")
-    reduced_datum_value = {'magnitude': mag, 'error': magerr, 'filter': 'Clear', 'instrument': 'CSS'}
+             f"{mjdmid}, {mlscore}, {mlbogus}, {mlreal}, {ncomb}) RETURNING id;")
+    # the .item() is needed to convert any np.float32 to np.float64, which is JSON serializable
+    reduced_datum_value = {'magnitude': mag.item(), 'error': magerr.item(), 'filter': 'Clear', 'instrument': 'CSS'}
     db.query(f"INSERT INTO tom_dataproducts_reduceddatum (data_type, source_name, source_location, timestamp, value, "
              f"target_id) VALUES ('photometry', 'SAGUARO pipeline', 'SAGUARO pipeline', "
              f"'{Time(mjdmid, format='mjd').iso}', '{json.dumps(reduced_datum_value)}', {targetid:d})")
