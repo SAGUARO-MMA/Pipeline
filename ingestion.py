@@ -20,6 +20,10 @@ def movingobjectcatalog(obsmjd):
     if not os.path.exists(fnam):
         os.system('wget -O MPCORB.DAT http://www.minorplanetcenter.org/iau/MPCORB/MPCORB.DAT')
         os.system('python MPCORB2MonthlyCatalog.py')
+    elif time.time() - os.path.getmtime(fnam)>(24*60*60):
+        os.system('rm '+fnam)
+        os.system('wget -O MPCORB.DAT http://www.minorplanetcenter.org/iau/MPCORB/MPCORB.DAT')
+        os.system('python MPCORB2MonthlyCatalog.py')
     with open(fnam) as f_catalog:
         for line in f_catalog:
             catalog_list.append(line.rstrip())
