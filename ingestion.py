@@ -147,9 +147,9 @@ def ingestion(transCatalog, log=None):
     if len(resfile) == 0 or len(resfile) < len(image_data):
 
         # Moving Object Classification
-        #    catalog=movingobjectcatalog(float(hdr['MJD']))
-        #    ra, dec = radectodecimal(hdr['RA'], hdr['DEC'])
-        #    filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
+        catalog=movingobjectcatalog(float(hdr['MJD']))
+        ra, dec = radectodecimal(hdr['RA'], hdr['DEC'])
+        filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
 
         if 'MJDMID' not in hdr:
             mmjd = hdr['MJD'] + hdr['EXPTIME'] / 2. / 86400.
@@ -214,11 +214,11 @@ def ingestion(transCatalog, log=None):
                 tml.append(time.time() - rowt0)
 
                 # Moving Object Classification
-                #   mvobj=movingobjectfilter(filtered_catalog,float(row[7]),float(row[8]), float(hdr['MJD']), 25.0)
-                #  if len(mvobj)==0:
-                #      classification='0'
-                #  else:
-                #      classification='1'
+                mvobj=movingobjectfilter(filtered_catalog,float(row[7]),float(row[8]), float(hdr['MJD']), 25.0)
+                if len(mvobj)==0:
+                    classification='0'
+                else:
+                    classification='1'
 #                tmobjmatch.append(time.time() - rowt0)
 
 
