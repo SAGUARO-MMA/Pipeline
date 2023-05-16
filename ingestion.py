@@ -227,11 +227,11 @@ def ingestion(transCatalog, log=None):
                 tml.append(time.time() - rowt0)
 
                 # Moving Object Classification
-                mvobj=movingobjectfilter(filtered_catalog,float(row[7]),float(row[8]), float(hdr['MJD']), 25.0)
-                if len(mvobj)==0:
-                    classification='0'
+                mvobj = movingobjectfilter(filtered_catalog, float(row[7]), float(row[8]), float(hdr['MJD']), 25.0)
+                if mvobj:
+                    classification = 1
                 else:
-                    classification='1'
+                    classification = 0
 #                tmobjmatch.append(time.time() - rowt0)
 
                 tml_nn_start = time.time()
@@ -250,7 +250,8 @@ def ingestion(transCatalog, log=None):
 
                 newsql.ingestcandidates(row['NUMBER'], basefile, row['ELONGATION'], ra, dec, row['FWHM_TRANS'],
                                         row['S2N'], row['MAG_PSF'], row['MAGERR_PSF'], rawfile, hdr['DATE-OBS'],
-                                        hdr['OBJECT'], 0, cx, cy, cz, -1, res['id'][0], mmjd, score, score_bogus, score_real, hdr['NCOMBINE'])
+                                        hdr['OBJECT'], classification, cx, cy, cz, -1, res['id'][0], mmjd, score,
+                                        score_bogus, score_real, hdr['NCOMBINE'])
                 tcingest.append(time.time() - rowt0)
 
     tcomp = time.time() - imgt0
