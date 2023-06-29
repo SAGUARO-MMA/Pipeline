@@ -30,6 +30,7 @@ except ImportError:
     from io import StringIO
 import requests
 import saguaro_pipe
+import settings
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -91,7 +92,7 @@ def action(event, date, read_path, write_path, field):
     zp = []
     global bad_images
     out_file = os.path.basename(files[0]).split('_00')[0] + '_med.fits'
-    unique_dir = '/mnt/dsand/saguaro/data/css/tmp/' + date + '/' + uuid.uuid1().hex + '/'
+    unique_dir = f'{css.work_path(date)}/{uuid.uuid1().hex}/'
     os.makedirs(unique_dir)
     for i, f in enumerate(files):
         subprocess.call(['cp', f, unique_dir])
@@ -169,7 +170,7 @@ def action(event, date, read_path, write_path, field):
         subprocess.call(['fpack', '-D', '-Y', '-g', unique_dir + out_file.replace('.fits', '_mask.fits')])
         subprocess.call(['mv', unique_dir + out_file + '.fz', write_path])
         subprocess.call(['mv', unique_dir + out_file.replace('.fits', '_mask.fits') + '.fz', write_path])
-        os.chdir('/mnt/dsand/saguaro/')
+        os.chdir(settings.ROOT_PATH)
         subprocess.call(['rm', '-r', unique_dir])
         print('Created ' + out_file)
     ncombine.append(len(combine))
@@ -233,7 +234,7 @@ logger = saguaro_pipe.MyLogger(log, log_stream, 'css')  # load logger handler
 
 logger.critical('Median watcher started.')
 
-read_path = '/mnt/dsand/css/G96/' + datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
+read_path = css.incoming_path(date)
 read_dir = False
 while read_dir is False:
     if not os.path.exists(read_path):
@@ -248,7 +249,7 @@ while read_dir is False:
             time.sleep(1)
     else:
         read_dir = True
-write_path = '/mnt/dsand/saguaro/data/css/raw/' + datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
+write_path = css.read_path(date)  # median watcher writes the stacked images to the pipeline's read_path
 if not os.path.exists(write_path):
     os.makedirs(write_path)
 
@@ -292,7 +293,7 @@ files_sex = len(glob.glob(read_path + '/G96*_N*.sext.gz')) + len(glob.glob(read_
 files_head = len(glob.glob(read_path + '/G96*_N*.arch_h')) + len(glob.glob(read_path + '/G96*_S*.arch_h'))
 logger.critical(f'There seem to be {files_sex - files_raw:d} images missing based on the SExtractor files.')
 logger.critical(f'There seem to be {files_head - files_raw:d} images missing based on the header files.')
-files_trans = glob.glob(css.write_path() + css.red_path(date) + '/G96*Scorr.fits.fz')
+files_trans = glob.glob(css.red_path(date) + '/G96*Scorr.fits.fz')
 candidates = []
 for f in files_trans:
     with fits.open(f) as hdr:

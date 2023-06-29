@@ -58,13 +58,13 @@ def cleanup(file, ref, unique_dir):
         header = hdr[0].header
     fieldID = tel.fieldID(header)
     print('fieldID: ', fieldID)
-    print(write_path + red_path)
+    print(red_path)
     if ref:
-        cp_dir = write_path + red_path
+        cp_dir = red_path
         cp_files = ['_wcs.fits', '_mask.fits', '_trans.fits', '_Scorr.fits']
     else:
         file = fieldID
-        cp_dir = write_path + 'ref/' + fieldID + '/'
+        cp_dir = tel.ref_path(fieldID)
         cp_files = ['_wcs.fits', '_bkg.fits', '_bkg_std.fits', '_cat.fits', '_ldac.fits', '_psf.fits', '_psfex.cat',
                     '.log']
 
@@ -421,18 +421,15 @@ def main(telescope=None, date=None, cpu=None):
         else:
             read_dir = True
 
-    global write_path, work_path, log_path, red_path
-    write_path = tel.write_path()  # set write path: where reduced data is written to
-    os.makedirs(write_path, exist_ok=True)  # if write path does not exist, make path
-
+    global work_path, log_path, red_path
     work_path = tel.work_path(date)  # set tmp work path: where data is reduced
     os.makedirs(work_path, exist_ok=True)  # if tmp work path does not exist, make path
 
     log_path = tel.log_path()  # set logpath: where log is written
-    os.makedirs(write_path + log_path, exist_ok=True)  # if log path does not exist, make path
+    os.makedirs(log_path, exist_ok=True)  # if log path does not exist, make path
 
     red_path = tel.red_path(date)  # set path where reduced science images are written to
-    os.makedirs(write_path + red_path, exist_ok=True)  # if path does not exist, make path
+    os.makedirs(red_path, exist_ok=True)  # if path does not exist, make path
 
     global q, logger, log_file_name
     q = Manager().Queue()  # create queue for logging
@@ -468,11 +465,11 @@ def main(telescope=None, date=None, cpu=None):
                 except IOError as e:
                     q.put(logger.error('Job failed due to: ' + str(e)))
             q.put(logger.info('Processed all data taken on the night of ' + date + '.'))
-            final_number = len(glob.glob(write_path + red_path + '*_trans.fits*'))
+            final_number = len(glob.glob(red_path + '*_trans.fits*'))
             q.put(logger.info(f'Summary: {len(files):d} files found, {final_number:d} successfully processed.'))
             q.put(logger.info(f'Total wall-time spent: {time.time() - t0} s'))
             logging.shutdown()
-            shutil.move(work_path + log_file_name + '.log', write_path + log_path)  # move log file to correct location
+            shutil.move(work_path + log_file_name + '.log', log_path)  # move log file to correct location 
         else:  # reduce data in real time, don't redo files alread reduced
             pool = Pool(cpu)  # create pool with given CPUs and queue feeding into action function
             observer = Observer()  # create observer
@@ -490,7 +487,7 @@ def main(telescope=None, date=None, cpu=None):
                     while pool._cache != {}:
                         time.sleep(1)
                     q.put(logger.critical('Scheduled time reached, exiting pipeline.'))
-                    final_number = len(glob.glob(write_path + red_path + '*_trans.fits*'))
+                    final_number = len(glob.glob(red_path + '*_trans.fits*'))
                     q.put(logger.critical(f'Summary: '
                                           f'{len(glob.glob(read_path + "/" + file_name)):d} input images found, '
                                           f'{final_number:d} successfully processed.'))
@@ -499,7 +496,7 @@ def main(telescope=None, date=None, cpu=None):
                     pool.close()  # close pool
                     pool.join()  # join pool
                     logging.shutdown()
-                    shutil.move(work_path + log_file_name + '.log', write_path + log_path)  # move log file
+                    shutil.move(work_path + log_file_name + '.log', log_path)  # move log file 
                     sys.exit()
                 else:  # if scheduled exit time has not reached, continue
                     time.sleep(1)
@@ -507,13 +504,13 @@ def main(telescope=None, date=None, cpu=None):
     except OSError as e:  # if OS error occurs, exit pipeline
         q.put(logger.critical('OS related error occurred during reduction: ' + str(e)))
         logging.shutdown()
-        shutil.move(work_path + log_file_name + '.log', write_path + log_path + log_file_name + '.log')  # move log file
+        shutil.move(work_path + log_file_name + '.log', log_path)  # move log file
         sys.exit(-1)
 
     except SystemError as e:  # if system error occurs, exit pipeline
         q.put(logger.critical('Interpreter-related error occurred during reduction: ' + str(e)))
         logging.shutdown()
-        shutil.move(work_path + log_file_name + '.log', write_path + log_path + log_file_name + '.log')  # move log file
+        shutil.move(work_path + log_file_name + '.log', log_path)  # move log file
         sys.exit(-1)
 
 
