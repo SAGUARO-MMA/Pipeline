@@ -43,35 +43,35 @@ def write_path():
     """
     Returns the absolute path containing all the data products for this telescope.
     """
-    return f'{settings.ROOT_PATH}/data/css/'
+    return f'{settings.ROOT_PATH}/data/css'
 
 
 def work_path(date):
     """
     Returns the absolute path to the working directory for the pipeline.
     """
-    return f'{write_path()}/tmp/{date}/'
+    return f'{write_path()}/tmp/{date}'
 
 
 def log_path():
     """
     Returns the absolute path where log files are written to.
     """
-    return f'{write_path()}/log/'
+    return f'{write_path()}/log'
 
 
 def red_path(date):
     """
     Returns the absolute path where reduced science images are written to.
     """
-    return f'{write_path()}/red/{date}/'
+    return f'{write_path()}/red/{date}'
 
 
 def ref_path(field_id):
     """
     Returns the absolute path where reference images are stored.
     """
-    return f'{write_path()}/ref/{field_id}/'
+    return f'{write_path()}/ref/{field_id}'
 
 
 def file_name():
