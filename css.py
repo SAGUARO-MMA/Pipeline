@@ -15,7 +15,6 @@ import warnings
 
 from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
-from slack import WebClient
 
 import saguaro_pipe
 import settings
@@ -116,15 +115,6 @@ def binning():
     Returns the image binning used during the determination of the satellite trail mask.
     """
     return 2
-
-
-def slack_client():
-    """
-    Returns the slackclient of the saguaro pipeline channel.
-    """
-    with open('/dataraid6/sassy/software/saguaro_slack.txt', 'r') as f:
-        slack_token = f.readline().rstrip()
-    return WebClient(token=slack_token)
 
 
 def mask_edge_pixels(data, mask):

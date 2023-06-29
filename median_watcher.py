@@ -23,12 +23,7 @@ from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
 import css
 import shutil
-import logging
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
-import requests
+import saguaro_logging
 import saguaro_pipe
 import settings
 import matplotlib
@@ -101,7 +96,7 @@ def action(event, date, read_path, write_path, field):
             c = unique_dir + os.path.basename(f)
             con = True
         except:
-            logging.error('No header available for ' + f)
+            logger.error('No header available for ' + f)
             con = False
         if con:
             with fits.open(c) as hdr:
@@ -122,7 +117,7 @@ def action(event, date, read_path, write_path, field):
                     else:
                         bad_images += 1
                 except:
-                    logging.critical('Error with file ' + f)
+                    logger.critical('Error with file ' + f)
                 with fits.open(css.bad_pixel_mask()) as bpm_hdr:
                     mask_header = bpm_hdr[0].header
                     data = bpm_hdr[0].data
@@ -218,19 +213,8 @@ try:
 except:
     date = datetime.datetime.utcnow().strftime('%Y/%m/%d')
 
-log_stream = StringIO()  # create log stream for upload to slack
-log_file_name = '/dataraid6/sassy/log/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-log = logging.getLogger(log_file_name)  # create logger
-log.setLevel(logging.INFO)  # set level of logger
-formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")  # set format of logger
-logging.Formatter.converter = time.gmtime  # convert time in logger to UCT
-filehandler = logging.FileHandler(log_file_name + '.log', 'w+')  # create log file
-filehandler.setFormatter(formatter)  # add format to log file
-log.addHandler(filehandler)  # link log file to logger
-streamhandler_slack = logging.StreamHandler(log_stream)  # add log stream to logger
-streamhandler_slack.setFormatter(formatter)  # add format to log stream
-log.addHandler(streamhandler_slack)  # link logger to log stream
-logger = saguaro_pipe.MyLogger(log, log_stream, 'css')  # load logger handler
+log_file_name = f'{css.log_path()}/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+logger = saguaro_logging.initialize_logger(log_file_name)
 
 logger.critical('Median watcher started.')
 
@@ -243,7 +227,7 @@ while read_dir is False:
         if done:
             logger.critical('Scheduled time reached.')
             logger.critical('No data ingested.')
-            logging.shutdown()
+            logger.shutdown()
             sys.exit()
         else:
             time.sleep(1)
@@ -302,10 +286,6 @@ plt.hist(candidates, bins=np.arange(0, 9000, 100))
 plt.title('Candidate summary for ' + date)
 plt.xlabel('Number of candidates per field')
 plt.savefig(log_file_name + '.pdf')
-my_file = {'file': (log_file_name + '.pdf', open(log_file_name + '.pdf', 'rb'), 'pdf')}
-with open('/dataraid6/sassy/software/saguaro_slack.txt', 'r') as f:
-    slack_token = f.readline().rstrip()
-payload = {"filename": log_file_name + '.pdf', "token": slack_token, "channels": ['#pipeline']}
-requests.post("https://slack.com/api/files.upload", params=payload, files=my_file)
-logging.shutdown()
+logger.slack_client.files_upload(channels=['#pipeline'], file=log_file_name)
+logger.shutdown()
 sys.exit()
