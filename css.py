@@ -28,21 +28,21 @@ def read_path(date):
     Returns the absolute path where raw files are stored.
     """
     read_date = datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
-    return '/home/saguaro/data/css/raw/' + read_date
+    return '/mnt/dsand/saguaro/data/css/raw/' + read_date
 
 
 def write_path():
     """
     Returns the absolute path where reduced files are written to.
     """
-    return '/home/saguaro/data/css/'
+    return '/mnt/dsand/saguaro/data/css/'
 
 
 def work_path(date):
     """
     Returns the working directory for the pipeline.
     """
-    return '/home/saguaro/data/css/tmp/' + date + '/'
+    return '/mnt/dsand/saguaro/data/css/tmp/' + date + '/'
 
 
 def log_path():
@@ -77,7 +77,7 @@ def bad_pixel_mask():
     """
     Returns the full path of the bad pixel mask.
     """
-    return '/home/saguaro/software/Pipeline/css_bpm.fits'
+    return '/dataraid6/sassy/Pipeline/css_bpm.fits'
 
 
 def fieldID(header):
@@ -106,7 +106,7 @@ def slack_client():
     """
     Returns the slackclient of the saguaro pipeline channel.
     """
-    with open('/home/saguaro/software/saguaro_slack.txt', 'r') as f:
+    with open('/dataraid6/sassy/software/saguaro_slack.txt', 'r') as f:
         slack_token = f.readline().rstrip()
     return WebClient(token=slack_token)
 

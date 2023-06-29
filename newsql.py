@@ -7,7 +7,7 @@ import json
 
 class Dictdb:
     def __init__(self):
-        connstring = open('/home/saguaro/software/webapptesting/sassy.conn').readline()
+        connstring = open('/dataraid6/sassy/software/webapptesting/sassy.conn').readline()
         self.conn = psycopg2.connect(connstring)
         self.cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 

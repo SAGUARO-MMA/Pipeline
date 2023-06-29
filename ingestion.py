@@ -133,12 +133,12 @@ def imgscale(data):
 def ingestion(transCatalog, log=None):
     if log is not None:
         log.info('Ingesting catalog.')
-    ml_model = '/home/saguaro/software/lundquist/rf_model.ml'
+    ml_model = '/dataraid6/sassy/Pipeline/rf_model.ml'
     print('Loading classifier\n')
     classifier = pickle.load(open(ml_model, 'rb'))
     print('Classifier loaded\n')
     print('Loading NN classifier\n')
-    model = models.load_model('/home/saguaro/software/Pipeline/model_onlyscorr16_ml',compile=False)
+    model = models.load_model('/dataraid6/sassy/Pipeline/model_onlyscorr16_ml',compile=False)
     model.compile(optimizer='Adam',metrics=['accuracy'],loss='binary_crossentropy')
     print('NN classifer loaded\n')
     imgt0 = time.time()
@@ -151,7 +151,7 @@ def ingestion(transCatalog, log=None):
     print(str(len(image_data)) + ' candidates found.')
     rawfile = transCatalog.replace('_red_trans.fits', '.arch')
     basefile = os.path.basename(transCatalog)
-    pngpath_main = f'/home/saguaro/data/png/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
+    pngpath_main = f'/dataraid6/sassy/png/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
     resfile, resnumber = newsql.pipecandmatch(basefile)
     tpng, tml, tml_nn, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], [], [], []
     print(resfile, len(resfile), len(image_data))

@@ -91,7 +91,7 @@ def action(event, date, read_path, write_path, field):
     zp = []
     global bad_images
     out_file = os.path.basename(files[0]).split('_00')[0] + '_med.fits'
-    unique_dir = '/home/saguaro/data/css/tmp/' + date + '/' + uuid.uuid1().hex + '/'
+    unique_dir = '/mnt/dsand/saguaro/data/css/tmp/' + date + '/' + uuid.uuid1().hex + '/'
     os.makedirs(unique_dir)
     for i, f in enumerate(files):
         subprocess.call(['cp', f, unique_dir])
@@ -169,7 +169,7 @@ def action(event, date, read_path, write_path, field):
         subprocess.call(['fpack', '-D', '-Y', '-g', unique_dir + out_file.replace('.fits', '_mask.fits')])
         subprocess.call(['mv', unique_dir + out_file + '.fz', write_path])
         subprocess.call(['mv', unique_dir + out_file.replace('.fits', '_mask.fits') + '.fz', write_path])
-        os.chdir('/home/saguaro/')
+        os.chdir('/mnt/dsand/saguaro/')
         subprocess.call(['rm', '-r', unique_dir])
         print('Created ' + out_file)
     ncombine.append(len(combine))
@@ -218,7 +218,7 @@ except:
     date = datetime.datetime.utcnow().strftime('%Y/%m/%d')
 
 log_stream = StringIO()  # create log stream for upload to slack
-log_file_name = '/home/saguaro/data/log/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+log_file_name = '/dataraid6/sassy/log/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
 log = logging.getLogger(log_file_name)  # create logger
 log.setLevel(logging.INFO)  # set level of logger
 formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")  # set format of logger
@@ -233,7 +233,7 @@ logger = saguaro_pipe.MyLogger(log, log_stream, 'css')  # load logger handler
 
 logger.critical('Median watcher started.')
 
-read_path = '/home/data/css/G96/' + datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
+read_path = '/mnt/dsand/css/G96/' + datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
 read_dir = False
 while read_dir is False:
     if not os.path.exists(read_path):
@@ -248,7 +248,7 @@ while read_dir is False:
             time.sleep(1)
     else:
         read_dir = True
-write_path = '/home/saguaro/data/css/raw/' + datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
+write_path = '/mnt/dsand/saguaro/data/css/raw/' + datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
 if not os.path.exists(write_path):
     os.makedirs(write_path)
 
@@ -302,7 +302,7 @@ plt.title('Candidate summary for ' + date)
 plt.xlabel('Number of candidates per field')
 plt.savefig(log_file_name + '.pdf')
 my_file = {'file': (log_file_name + '.pdf', open(log_file_name + '.pdf', 'rb'), 'pdf')}
-with open('/home/saguaro/software/saguaro_slack.txt', 'r') as f:
+with open('/dataraid6/sassy/software/saguaro_slack.txt', 'r') as f:
     slack_token = f.readline().rstrip()
 payload = {"filename": log_file_name + '.pdf', "token": slack_token, "channels": ['#pipeline']}
 requests.post("https://slack.com/api/files.upload", params=payload, files=my_file)
