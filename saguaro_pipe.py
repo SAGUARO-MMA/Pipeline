@@ -321,7 +321,7 @@ def main(telescope=None, date=None, cpu=None):
         C = importlib.import_module('Settings.Constants_' + telescope)
     except ImportError:
         print('No such telescope file, please check that the file is in the same directory as the pipeline.')
-#        q.put(logger.error('No such telescope file, please check that the file is in the same directory as the pipeline.'))
+        sys.exit(-1)
 
     tel_zone = tel.tel_zone()
     tel_delta = tel.tel_delta()
