@@ -23,14 +23,13 @@ from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
 from acstools.satdet import detsat, make_mask
 import gc
-import saguaro_logging
 import uuid
 import traceback
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
 import zogy
-import ingestion
+from . import ingestion, saguaro_logging
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()

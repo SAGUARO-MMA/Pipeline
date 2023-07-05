@@ -21,11 +21,8 @@ import uuid
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
-import css
+from . import css, saguaro_logging, saguaro_pipe
 import shutil
-import saguaro_logging
-import saguaro_pipe
-import settings
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -165,7 +162,7 @@ def action(event, date, read_path, write_path, field):
         subprocess.call(['fpack', '-D', '-Y', '-g', unique_dir + out_file.replace('.fits', '_mask.fits')])
         subprocess.call(['mv', unique_dir + out_file + '.fz', write_path])
         subprocess.call(['mv', unique_dir + out_file.replace('.fits', '_mask.fits') + '.fz', write_path])
-        os.chdir(settings.ROOT_PATH)
+        os.chdir(os.environ['SAGUARO_ROOT'])
         subprocess.call(['rm', '-r', unique_dir])
         print('Created ' + out_file)
     ncombine.append(len(combine))

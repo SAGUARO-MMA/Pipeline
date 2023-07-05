@@ -16,8 +16,7 @@ import warnings
 from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
 
-import saguaro_pipe
-import settings
+from . import saguaro_pipe
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()
@@ -28,7 +27,7 @@ def incoming_path(date):
     Returns the absolute path containing the incoming raw data from this telescope.
     """
     data_date = datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
-    return f'{settings.ROOT_PATH}/css_incoming/{data_date}'
+    return f'{os.environ["SAGUARO_ROOT"]}/css_incoming/{data_date}'
 
 
 def read_path(date):
@@ -43,7 +42,7 @@ def write_path():
     """
     Returns the absolute path containing all the data products for this telescope.
     """
-    return f'{settings.ROOT_PATH}/data/css'
+    return f'{os.environ["SAGUARO_ROOT"]}/data/css'
 
 
 def work_path(date):
@@ -92,7 +91,7 @@ def bad_pixel_mask():
     """
     Returns the full path of the bad pixel mask.
     """
-    return f'{settings.ROOT_PATH}/Pipeline/css_bpm.fits'
+    return 'css_bpm.fits'
 
 
 def fieldID(header):

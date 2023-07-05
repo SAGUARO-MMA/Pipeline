@@ -6,7 +6,7 @@ except ImportError:
 from slack import WebClient
 from slack.errors import SlackApiError
 import logging
-import settings
+import os
 
 
 class MyLogger(object):
@@ -58,5 +58,5 @@ def initialize_logger(log_file_name):
     streamhandler_slack = logging.StreamHandler(log_stream)  # add log stream to logger
     streamhandler_slack.setFormatter(formatter)  # add format to log stream
     log.addHandler(streamhandler_slack)  # link logger to log stream
-    slack_client = WebClient(token=settings.SLACK_TOKEN)
+    slack_client = WebClient(os.environ['SLACK_API_TOKEN'])
     return MyLogger(log, log_stream, slack_client)  # load logger handler

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools", "setuptools_scm[toml]"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "saguaro-pipeline"
+readme = "README.md"
+license.file = "LICENSE"
+dynamic = ["version", "dependencies"]
+
+[tool.setuptools]
+packages = ["saguaro_pipeline"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+dependencies.file = "requirements.txt"
+
+[tools.setuptools.packages.find]
+namespaces = true
+where = ['saguaro_pipeline']
+
+[tool.setuptools.package-data]
+saguaro_pipeline = ["css_bpm.fits"]
+"saguaro_pipeline.model_onlyscorr16_ml" = ["*.pb"]
+"saguaro_pipeline.model_onlyscorr16_ml.variables" = ['variables*']
+
+[tool.setuptools_scm]

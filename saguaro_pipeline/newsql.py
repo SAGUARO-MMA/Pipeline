@@ -3,12 +3,11 @@ import psycopg2.extras
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 import json
-import settings
 
 
 class Dictdb:
     def __init__(self):
-        self.conn = psycopg2.connect(settings.DB_CONN)
+        self.conn = psycopg2.connect('')  # read from environment variables
         self.cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
     def query(self, query):

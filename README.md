@@ -14,3 +14,22 @@ The parameters which can be set when starting the pipeline are:
 These parameters can be set use "--" when calling the python script e.g. python sauargo_pipe.py --telescope css --date 2020/01/02 --cpu 4
 
 Other scripts housed here includes the medain watcher (median_watcher.py) for the CSS telescope which is used to create a median combined image (from the 4 individual exposures) for sauargo_pipe.py to reduce for subtraction.
+
+## Environment Variables
+The pipeline needs the following environment variables to run:
+```bash
+ML_MODEL_NEW=/dataraid6/sassy/Pipeline/model_onlyscorr16_ml  # optional, the default is included in the package
+ML_MODEL_OLD=/dataraid6/sassy/Pipeline/rf_model.ml
+SAGUARO_ROOT=/dataraid6/sassy
+SLACK_API_TOKEN=xoxb-********
+THUMB_PATH=/dataraid6/sassy/data/png
+```
+
+as well as the PostgreSQL credentials:
+```bash
+PGHOST
+PGDATABASE
+PGUSER
+PGPASSWORD
+PGPORT
+```

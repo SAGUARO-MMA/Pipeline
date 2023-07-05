@@ -9,8 +9,7 @@ from astropy.coordinates.sky_coordinate import SkyCoord
 from astropy.io import fits
 import numpy as np
 
-import newsql
-import settings
+from . import newsql
 
 import tensorflow as tf
 from tensorflow.keras import models
@@ -191,10 +190,10 @@ def ingestion(transCatalog, log=None):
     if log is not None:
         log.info('Ingesting catalog.')
     print('Loading classifier\n')
-    classifier = pickle.load(open(settings.ML_MODEL_OLD, 'rb'))
+    classifier = pickle.load(open(os.environ['ML_MODEL_OLD'], 'rb'))
     print('Classifier loaded\n')
     print('Loading NN classifier\n')
-    model = models.load_model(settings.ML_MODEL_NEW, compile=False)
+    model = models.load_model(os.getenv('ML_MODEL_NEW', 'model_onlyscorr16_ml'), compile=False)
     model.compile(optimizer='Adam',metrics=['accuracy'],loss='binary_crossentropy')
     print('NN classifer loaded\n')
     imgt0 = time.time()
@@ -207,7 +206,7 @@ def ingestion(transCatalog, log=None):
     print(str(len(image_data)) + ' candidates found.')
     rawfile = transCatalog.replace('_red_trans.fits', '.arch')
     basefile = os.path.basename(transCatalog)
-    pngpath_main = f'{settings.THUMB_PATH}/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
+    pngpath_main = f'{os.environ["THUMB_PATH"]}/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
     resfile, resnumber = newsql.pipecandmatch(basefile)
     tpng, tml, tml_nn, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], [], [], []
     print(resfile, len(resfile), len(image_data))
