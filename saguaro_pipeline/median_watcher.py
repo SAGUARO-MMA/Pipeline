@@ -198,91 +198,92 @@ class FileWatcher(FileSystemEventHandler, object):
             action(event, self._date, self._read_path, self._write_path, field)
 
 
-global field_list, ncombine, logger, bad_images, missing_head
+def cli():
+    global field_list, ncombine, logger, bad_images, missing_head
 
-try:
-    mode = sys.argv[1]
-except:
-    mode = False
+    try:
+        mode = sys.argv[1]
+    except:
+        mode = False
 
-try:
-    date = sys.argv[2]
-except:
-    date = datetime.datetime.utcnow().strftime('%Y/%m/%d')
+    try:
+        date = sys.argv[2]
+    except:
+        date = datetime.datetime.utcnow().strftime('%Y/%m/%d')
 
-log_file_name = f'{css.log_path()}/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-logger = saguaro_logging.initialize_logger(log_file_name)
+    log_file_name = f'{css.log_path()}/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    logger = saguaro_logging.initialize_logger(log_file_name)
 
-logger.critical('Median watcher started.')
+    logger.critical('Median watcher started.')
 
-read_path = css.incoming_path(date)
-read_dir = False
-while read_dir is False:
-    if not os.path.exists(read_path):
-        print('waiting for directory to be created...')
-        done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
-        if done:
-            logger.critical('Scheduled time reached.')
-            logger.critical('No data ingested.')
-            logger.shutdown()
-            sys.exit()
+    read_path = css.incoming_path(date)
+    read_dir = False
+    while read_dir is False:
+        if not os.path.exists(read_path):
+            print('waiting for directory to be created...')
+            done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
+            if done:
+                logger.critical('Scheduled time reached.')
+                logger.critical('No data ingested.')
+                logger.shutdown()
+                sys.exit()
+            else:
+                time.sleep(1)
         else:
-            time.sleep(1)
-    else:
-        read_dir = True
-write_path = css.read_path(date)  # median watcher writes the stacked images to the pipeline's read_path
-if not os.path.exists(write_path):
-    os.makedirs(write_path)
+            read_dir = True
+    write_path = css.read_path(date)  # median watcher writes the stacked images to the pipeline's read_path
+    if not os.path.exists(write_path):
+        os.makedirs(write_path)
 
-field_list = []
-ncombine = []
-bad_images = 0
-missing_head = 0
+    field_list = []
+    ncombine = []
+    bad_images = 0
+    missing_head = 0
 
-if mode:  # to rerun all data
-    files = glob.glob(read_path + '/G96*.calb.fz')
-    for f in files:
-        field = check_field(f)
-        if field:
-            action(f, date, read_path, write_path, field)
-else:  # normal real-time reduction
-    observer = Observer()
-    observer.schedule(FileWatcher(date, read_path, write_path), read_path, recursive=False)
-    observer.start()
-    while True:
-        done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
-        if done:
-            logger.critical('Scheduled time reached.')
-            observer.stop()
-            observer.join()
-            break
-        else:
-            time.sleep(1)
+    if mode:  # to rerun all data
+        files = glob.glob(read_path + '/G96*.calb.fz')
+        for f in files:
+            field = check_field(f)
+            if field:
+                action(f, date, read_path, write_path, field)
+    else:  # normal real-time reduction
+        observer = Observer()
+        observer.schedule(FileWatcher(date, read_path, write_path), read_path, recursive=False)
+        observer.start()
+        while True:
+            done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
+            if done:
+                logger.critical('Scheduled time reached.')
+                observer.stop()
+                observer.join()
+                break
+            else:
+                time.sleep(1)
 
-ncombine = np.asarray(ncombine)
-logger.critical(f'''Median watcher summary:
-{len(ncombine):d} fields observed,
-{len(ncombine[ncombine == 4]):d} medians made with 4 images,
-{len(ncombine[ncombine == 3]):d} medians made with 3 images,
-{len(ncombine[ncombine == 2]):d} medians made with 2 images,
-{len(ncombine[ncombine == 1]):d} medians made with 1 image,
-{len(ncombine[ncombine == 0]):d} medians not made,
-{bad_images:d} images not used due to bad weather.
-''')
-files_raw = len(glob.glob(read_path + '/G96*_N*.calb.fz')) + len(glob.glob(read_path + '/G96*_S*.calb.fz'))
-files_sex = len(glob.glob(read_path + '/G96*_N*.sext.gz')) + len(glob.glob(read_path + '/G96*_S*.sext.gz'))
-files_head = len(glob.glob(read_path + '/G96*_N*.arch_h')) + len(glob.glob(read_path + '/G96*_S*.arch_h'))
-logger.critical(f'There seem to be {files_sex - files_raw:d} images missing based on the SExtractor files.')
-logger.critical(f'There seem to be {files_head - files_raw:d} images missing based on the header files.')
-files_trans = glob.glob(css.red_path(date) + '/G96*Scorr.fits.fz')
-candidates = []
-for f in files_trans:
-    with fits.open(f) as hdr:
-        candidates.append(hdr[1].header['T-NTRANS'])
-plt.hist(candidates, bins=np.arange(0, 9000, 100))
-plt.title('Candidate summary for ' + date)
-plt.xlabel('Number of candidates per field')
-plt.savefig(log_file_name + '.pdf')
-logger.slack_client.files_upload(channels=['#pipeline'], file=log_file_name)
-logger.shutdown()
-sys.exit()
+    ncombine = np.asarray(ncombine)
+    logger.critical(f'''Median watcher summary:
+    {len(ncombine):d} fields observed,
+    {len(ncombine[ncombine == 4]):d} medians made with 4 images,
+    {len(ncombine[ncombine == 3]):d} medians made with 3 images,
+    {len(ncombine[ncombine == 2]):d} medians made with 2 images,
+    {len(ncombine[ncombine == 1]):d} medians made with 1 image,
+    {len(ncombine[ncombine == 0]):d} medians not made,
+    {bad_images:d} images not used due to bad weather.
+    ''')
+    files_raw = len(glob.glob(read_path + '/G96*_N*.calb.fz')) + len(glob.glob(read_path + '/G96*_S*.calb.fz'))
+    files_sex = len(glob.glob(read_path + '/G96*_N*.sext.gz')) + len(glob.glob(read_path + '/G96*_S*.sext.gz'))
+    files_head = len(glob.glob(read_path + '/G96*_N*.arch_h')) + len(glob.glob(read_path + '/G96*_S*.arch_h'))
+    logger.critical(f'There seem to be {files_sex - files_raw:d} images missing based on the SExtractor files.')
+    logger.critical(f'There seem to be {files_head - files_raw:d} images missing based on the header files.')
+    files_trans = glob.glob(css.red_path(date) + '/G96*Scorr.fits.fz')
+    candidates = []
+    for f in files_trans:
+        with fits.open(f) as hdr:
+            candidates.append(hdr[1].header['T-NTRANS'])
+    plt.hist(candidates, bins=np.arange(0, 9000, 100))
+    plt.title('Candidate summary for ' + date)
+    plt.xlabel('Number of candidates per field')
+    plt.savefig(log_file_name + '.pdf')
+    logger.slack_client.files_upload(channels=['#pipeline'], file=log_file_name)
+    logger.shutdown()
+    sys.exit()

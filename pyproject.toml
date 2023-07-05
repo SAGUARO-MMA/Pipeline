@@ -8,6 +8,10 @@ readme = "README.md"
 license.file = "LICENSE"
 dynamic = ["version", "dependencies"]
 
+[project.scripts]
+median-watcher = "saguaro_pipeline.median_watcher:cli"
+saguaro-pipe = "saguaro_pipeline.saguaro_pipe:cli"
+
 [tool.setuptools.dynamic]
 dependencies.file = "requirements.txt"
 

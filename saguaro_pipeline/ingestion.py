@@ -192,7 +192,7 @@ def ingestion(transCatalog, log=None):
     classifier = pickle.load(open(os.environ['ML_MODEL_OLD'], 'rb'))
     print('Classifier loaded\n')
     print('Loading NN classifier\n')
-    ml_model_new = os.getenv('ML_MODEL_NEW', files('saguaro_pipeline').join('model_onlyscorr16_ml'))
+    ml_model_new = os.getenv('ML_MODEL_NEW', files('saguaro_pipeline').joinpath('model_onlyscorr16_ml'))
     model = models.load_model(ml_model_new, compile=False)
     model.compile(optimizer='Adam',metrics=['accuracy'],loss='binary_crossentropy')
     print('NN classifer loaded\n')

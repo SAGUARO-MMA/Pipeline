@@ -444,7 +444,7 @@ def main(telescope=None, date=None, cpu=None):
         sys.exit(-1)
 
 
-if __name__ == "__main__":
+def cli():
     params = argparse.ArgumentParser(description='User parameters.')
     params.add_argument('--telescope', default=None, help='Telescope of data.')  # telescope argument required
     params.add_argument('--date', default=None, help='Date of files to process.')  # optional date argument
