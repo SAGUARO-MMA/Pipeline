@@ -17,6 +17,7 @@ from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
 
 from . import saguaro_pipe
+from importlib.resources import files
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()
@@ -91,7 +92,7 @@ def bad_pixel_mask():
     """
     Returns the full path of the bad pixel mask.
     """
-    return 'css_bpm.fits'
+    return files('saguaro_pipeline').joinpath('css_bpm.fits')
 
 
 def fieldID(header):

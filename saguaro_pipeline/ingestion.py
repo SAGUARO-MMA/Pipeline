@@ -10,8 +10,7 @@ from astropy.io import fits
 import numpy as np
 
 from . import newsql
-
-import tensorflow as tf
+from importlib.resources import files
 from tensorflow.keras import models
 
 
@@ -193,7 +192,8 @@ def ingestion(transCatalog, log=None):
     classifier = pickle.load(open(os.environ['ML_MODEL_OLD'], 'rb'))
     print('Classifier loaded\n')
     print('Loading NN classifier\n')
-    model = models.load_model(os.getenv('ML_MODEL_NEW', 'model_onlyscorr16_ml'), compile=False)
+    ml_model_new = os.getenv('ML_MODEL_NEW', files('saguaro_pipeline').join('model_onlyscorr16_ml'))
+    model = models.load_model(ml_model_new, compile=False)
     model.compile(optimizer='Adam',metrics=['accuracy'],loss='binary_crossentropy')
     print('NN classifer loaded\n')
     imgt0 = time.time()
