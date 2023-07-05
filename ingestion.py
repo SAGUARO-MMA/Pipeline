@@ -207,7 +207,7 @@ def ingestion(transCatalog, log=None):
     print(str(len(image_data)) + ' candidates found.')
     rawfile = transCatalog.replace('_red_trans.fits', '.arch')
     basefile = os.path.basename(transCatalog)
-    pngpath_main = f'{settings.THUMB_PATH}/{basefile[4:12]}'
+    pngpath_main = f'{settings.THUMB_PATH}/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
     resfile, resnumber = newsql.pipecandmatch(basefile)
     tpng, tml, tml_nn, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], [], [], []
     print(resfile, len(resfile), len(image_data))
