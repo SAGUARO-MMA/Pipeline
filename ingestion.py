@@ -218,7 +218,7 @@ def ingestion(transCatalog, log=None):
         ra, dec = radectodecimal(hdr['RA'], hdr['DEC'])
         filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
 
-        if 'MJDMID' not in hdr:
+        if hdr.get('MJDMID', -1.) == -1.:  # CSS uses -1 as a sentinel value
             mmjd = hdr['MJD'] + hdr['EXPTIME'] / 2. / 86400.
         else:
             mmjd = hdr['MJDMID']
