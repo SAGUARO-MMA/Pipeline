@@ -1,0 +1,9 @@
+acstools~=3.6.1
+astroscrappy~=1.1.0
+ephem~=4.1.4
+lmfit~=1.2.1
+photutils~=1.8.0
+psycopg2~=2.9.6
+pyfftw~=0.13.1
+slackclient~=2.9.4
+tensorflow~=2.12.0

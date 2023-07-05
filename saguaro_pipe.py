@@ -22,31 +22,18 @@ import numpy as np
 from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
 from acstools.satdet import detsat, make_mask
-from slack.errors import SlackApiError
 import gc
-import logging
+import saguaro_logging
 import uuid
 import traceback
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-import shutil
 import fnmatch as fn
 import zogy
 import ingestion
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()
-
-
-def log_file():
-    """
-    Returns the name of the log file for the current pipeline run, using the current date and time in UTC.
-    """
-    return 'pipeline_run_' + datetime.datetime.utcnow().strftime("%Y%m%d_T%H%M%S")
 
 
 def cleanup(file, ref, unique_dir):
@@ -58,13 +45,13 @@ def cleanup(file, ref, unique_dir):
         header = hdr[0].header
     fieldID = tel.fieldID(header)
     print('fieldID: ', fieldID)
-    print(write_path + red_path)
+    print(red_path)
     if ref:
-        cp_dir = write_path + red_path
+        cp_dir = red_path
         cp_files = ['_wcs.fits', '_mask.fits', '_trans.fits', '_Scorr.fits']
     else:
         file = fieldID
-        cp_dir = write_path + 'ref/' + fieldID + '/'
+        cp_dir = tel.ref_path(fieldID)
         cp_files = ['_wcs.fits', '_bkg.fits', '_bkg_std.fits', '_cat.fits', '_ldac.fits', '_psf.fits', '_psfex.cat',
                     '.log']
 
@@ -105,47 +92,6 @@ def funpack_file(file):
     """
     subprocess.call(['funpack', '-D', file])
     return file.replace('.fz', '')
-
-
-class MyLogger(object):
-    """
-    Logger to control logging and uploading to slack.
-    """
-
-    def __init__(self, log, log_stream, telescope):
-        self._log = log
-        self._log_stream = log_stream
-        self._telescope = telescope
-
-    def info(self, text):
-        """
-        Logs messages to log file at the INFO level.
-        """
-        self._log.info(text)
-
-    def error(self, text):
-        """
-        Logs messages to log file at the ERROR level.
-        """
-        self._log.error(text)
-
-    def critical(self, text):
-        """
-        Logs messages to log file at the CRITICAL level.
-        """
-        self._log.critical(text)
-        try:
-            tel = importlib.import_module(self._telescope)
-            slack('pipeline', text, tel)  # upload to slack
-        except SlackApiError:  # if connection error occurs, add to log
-            self._log.error('Connection error: failed to connect to slack. Above meassage not uploaded.')
-
-
-def slack(channel, message, tel):
-    """
-    Slack bot for uploading messages to slack.
-    """
-    tel.slack_client().chat_postMessage(channel=channel, text=message)
 
 
 def scheduled_exit(date, telescope):
@@ -319,7 +265,7 @@ def action(item_list):
             q.put(logger.info('ZOGY comment: '+comment))
     except BaseException as e:
         q.put(logger.critical('Uncaught error occurred in ZOGY: '+reduced+' - ' + str(e)))
-        q.put(logger.critical(traceback(e)))
+        q.put(logger.critical(''.join(traceback.format_tb(e.__traceback__))))
     transient_catalog = reduced.replace('.fits', '_trans.fits')
     q.put(logger.info(unique_dir + '/' + transient_catalog))
     if os.path.exists(unique_dir + '/' + transient_catalog):
@@ -375,7 +321,7 @@ def main(telescope=None, date=None, cpu=None):
         C = importlib.import_module('Settings.Constants_' + telescope)
     except ImportError:
         print('No such telescope file, please check that the file is in the same directory as the pipeline.')
-#        q.put(logger.error('No such telescope file, please check that the file is in the same directory as the pipeline.'))
+        sys.exit(-1)
 
     tel_zone = tel.tel_zone()
     tel_delta = tel.tel_delta()
@@ -421,35 +367,21 @@ def main(telescope=None, date=None, cpu=None):
         else:
             read_dir = True
 
-    global write_path, work_path, log_path, red_path
-    write_path = tel.write_path()  # set write path: where reduced data is written to
-    os.makedirs(write_path, exist_ok=True)  # if write path does not exist, make path
-
+    global work_path, log_path, red_path
     work_path = tel.work_path(date)  # set tmp work path: where data is reduced
     os.makedirs(work_path, exist_ok=True)  # if tmp work path does not exist, make path
 
     log_path = tel.log_path()  # set logpath: where log is written
-    os.makedirs(write_path + log_path, exist_ok=True)  # if log path does not exist, make path
+    os.makedirs(log_path, exist_ok=True)  # if log path does not exist, make path
 
     red_path = tel.red_path(date)  # set path where reduced science images are written to
-    os.makedirs(write_path + red_path, exist_ok=True)  # if path does not exist, make path
+    os.makedirs(red_path, exist_ok=True)  # if path does not exist, make path
 
     global q, logger, log_file_name
     q = Manager().Queue()  # create queue for logging
     os.chdir(work_path)  # change to workong directory
-    log_stream = StringIO()  # create log stream for upload to slack
-    log_file_name = log_file()  # create log file name
-    log = logging.getLogger(log_file_name)  # create logger
-    log.setLevel(logging.INFO)  # set level of logger
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")  # set format of logger
-    logging.Formatter.converter = time.gmtime  # convert time in logger to UCT
-    filehandler = logging.FileHandler(log_file_name + '.log', 'w+')  # create log file
-    filehandler.setFormatter(formatter)  # add format to log file
-    log.addHandler(filehandler)  # link log file to logger
-    streamhandler_slack = logging.StreamHandler(log_stream)  # add log stream to logger
-    streamhandler_slack.setFormatter(formatter)  # add format to log stream
-    log.addHandler(streamhandler_slack)  # link logger to log stream
-    logger = MyLogger(log, log_stream, telescope)  # load logger handler
+    log_file_name = f'{log_path}/pipeline_run_{datetime.datetime.utcnow().strftime("%Y%m%d_T%H%M%S")}'
+    logger = saguaro_logging.initialize_logger(log_file_name)
 
     try:
         q.put(logger.info(f'Running pipeline version {__version__}, with setting file version {tel.__version__}.'))
@@ -468,11 +400,10 @@ def main(telescope=None, date=None, cpu=None):
                 except IOError as e:
                     q.put(logger.error('Job failed due to: ' + str(e)))
             q.put(logger.info('Processed all data taken on the night of ' + date + '.'))
-            final_number = len(glob.glob(write_path + red_path + '*_trans.fits*'))
+            final_number = len(glob.glob(red_path + '*_trans.fits*'))
             q.put(logger.info(f'Summary: {len(files):d} files found, {final_number:d} successfully processed.'))
             q.put(logger.info(f'Total wall-time spent: {time.time() - t0} s'))
-            logging.shutdown()
-            shutil.move(work_path + log_file_name + '.log', write_path + log_path)  # move log file to correct location
+            logger.shutdown()
         else:  # reduce data in real time, don't redo files alread reduced
             pool = Pool(cpu)  # create pool with given CPUs and queue feeding into action function
             observer = Observer()  # create observer
@@ -490,7 +421,7 @@ def main(telescope=None, date=None, cpu=None):
                     while pool._cache != {}:
                         time.sleep(1)
                     q.put(logger.critical('Scheduled time reached, exiting pipeline.'))
-                    final_number = len(glob.glob(write_path + red_path + '*_trans.fits*'))
+                    final_number = len(glob.glob(red_path + '*_trans.fits*'))
                     q.put(logger.critical(f'Summary: '
                                           f'{len(glob.glob(read_path + "/" + file_name)):d} input images found, '
                                           f'{final_number:d} successfully processed.'))
@@ -498,22 +429,19 @@ def main(telescope=None, date=None, cpu=None):
                     observer.join()  # join observer
                     pool.close()  # close pool
                     pool.join()  # join pool
-                    logging.shutdown()
-                    shutil.move(work_path + log_file_name + '.log', write_path + log_path)  # move log file
+                    logger.shutdown()
                     sys.exit()
                 else:  # if scheduled exit time has not reached, continue
                     time.sleep(1)
 
     except OSError as e:  # if OS error occurs, exit pipeline
         q.put(logger.critical('OS related error occurred during reduction: ' + str(e)))
-        logging.shutdown()
-        shutil.move(work_path + log_file_name + '.log', write_path + log_path + log_file_name + '.log')  # move log file
+        logger.shutdown()
         sys.exit(-1)
 
     except SystemError as e:  # if system error occurs, exit pipeline
         q.put(logger.critical('Interpreter-related error occurred during reduction: ' + str(e)))
-        logging.shutdown()
-        shutil.move(work_path + log_file_name + '.log', write_path + log_path + log_file_name + '.log')  # move log file
+        logger.shutdown()
         sys.exit(-1)
 
 

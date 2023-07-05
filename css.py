@@ -15,12 +15,20 @@ import warnings
 
 from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
-from slack import WebClient
 
 import saguaro_pipe
+import settings
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()
+
+
+def incoming_path(date):
+    """
+    Returns the absolute path containing the incoming raw data from this telescope.
+    """
+    data_date = datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
+    return f'{settings.ROOT_PATH}/css_incoming/{data_date}'
 
 
 def read_path(date):
@@ -28,35 +36,42 @@ def read_path(date):
     Returns the absolute path where raw files are stored.
     """
     read_date = datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
-    return '/home/saguaro/data/css/raw/' + read_date
+    return f'{write_path()}/raw/{read_date}'
 
 
 def write_path():
     """
-    Returns the absolute path where reduced files are written to.
+    Returns the absolute path containing all the data products for this telescope.
     """
-    return '/home/saguaro/data/css/'
+    return f'{settings.ROOT_PATH}/data/css'
 
 
 def work_path(date):
     """
-    Returns the working directory for the pipeline.
+    Returns the absolute path to the working directory for the pipeline.
     """
-    return '/home/saguaro/data/css/tmp/' + date + '/'
+    return f'{write_path()}/tmp/{date}'
 
 
 def log_path():
     """
-    Returns the relative path where log files are written to.
+    Returns the absolute path where log files are written to.
     """
-    return 'log/'
+    return f'{write_path()}/log'
 
 
 def red_path(date):
     """
-    Returns the relative path where reduced science images are written to.
+    Returns the absolute path where reduced science images are written to.
     """
-    return 'red/' + date + '/'
+    return f'{write_path()}/red/{date}'
+
+
+def ref_path(field_id):
+    """
+    Returns the absolute path where reference images are stored.
+    """
+    return f'{write_path()}/ref/{field_id}'
 
 
 def file_name():
@@ -77,7 +92,7 @@ def bad_pixel_mask():
     """
     Returns the full path of the bad pixel mask.
     """
-    return '/home/saguaro/software/Pipeline/css_bpm.fits'
+    return f'{settings.ROOT_PATH}/Pipeline/css_bpm.fits'
 
 
 def fieldID(header):
@@ -100,15 +115,6 @@ def binning():
     Returns the image binning used during the determination of the satellite trail mask.
     """
     return 2
-
-
-def slack_client():
-    """
-    Returns the slackclient of the saguaro pipeline channel.
-    """
-    with open('/home/saguaro/software/saguaro_slack.txt', 'r') as f:
-        slack_token = f.readline().rstrip()
-    return WebClient(token=slack_token)
 
 
 def mask_edge_pixels(data, mask):
@@ -252,7 +258,7 @@ def output(f, date):
     """
     Return the full path of the output used to determine if a file has been processed.
     """
-    return os.path.exists(write_path() + red_path(date) + os.path.basename(f.replace('.fits', '_trans.fits')))
+    return os.path.exists(red_path(date) + os.path.basename(f.replace('.fits', '_trans.fits')))
 
 
 def find_ref(reduced):
@@ -262,7 +268,7 @@ def find_ref(reduced):
     with fits.open(reduced) as hdr:
         header = hdr[0].header
     field = fieldID(header)
-    ref_files = glob.glob(write_path() + 'ref/' + field + '/*')
+    ref_files = glob.glob(ref_path(field) + '/*')
     for f in ref_files:
         subprocess.call(['cp', f, '.'])
         if '.fz' in f:

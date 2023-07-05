@@ -23,13 +23,9 @@ from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
 import css
 import shutil
-import logging
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
-import requests
+import saguaro_logging
 import saguaro_pipe
+import settings
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -91,7 +87,7 @@ def action(event, date, read_path, write_path, field):
     zp = []
     global bad_images
     out_file = os.path.basename(files[0]).split('_00')[0] + '_med.fits'
-    unique_dir = '/home/saguaro/data/css/tmp/' + date + '/' + uuid.uuid1().hex + '/'
+    unique_dir = f'{css.work_path(date)}/{uuid.uuid1().hex}/'
     os.makedirs(unique_dir)
     for i, f in enumerate(files):
         subprocess.call(['cp', f, unique_dir])
@@ -100,7 +96,7 @@ def action(event, date, read_path, write_path, field):
             c = unique_dir + os.path.basename(f)
             con = True
         except:
-            logging.error('No header available for ' + f)
+            logger.error('No header available for ' + f)
             con = False
         if con:
             with fits.open(c) as hdr:
@@ -121,7 +117,7 @@ def action(event, date, read_path, write_path, field):
                     else:
                         bad_images += 1
                 except:
-                    logging.critical('Error with file ' + f)
+                    logger.critical('Error with file ' + f)
                 with fits.open(css.bad_pixel_mask()) as bpm_hdr:
                     mask_header = bpm_hdr[0].header
                     data = bpm_hdr[0].data
@@ -169,7 +165,7 @@ def action(event, date, read_path, write_path, field):
         subprocess.call(['fpack', '-D', '-Y', '-g', unique_dir + out_file.replace('.fits', '_mask.fits')])
         subprocess.call(['mv', unique_dir + out_file + '.fz', write_path])
         subprocess.call(['mv', unique_dir + out_file.replace('.fits', '_mask.fits') + '.fz', write_path])
-        os.chdir('/home/saguaro/')
+        os.chdir(settings.ROOT_PATH)
         subprocess.call(['rm', '-r', unique_dir])
         print('Created ' + out_file)
     ncombine.append(len(combine))
@@ -217,23 +213,12 @@ try:
 except:
     date = datetime.datetime.utcnow().strftime('%Y/%m/%d')
 
-log_stream = StringIO()  # create log stream for upload to slack
-log_file_name = '/home/saguaro/data/log/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-log = logging.getLogger(log_file_name)  # create logger
-log.setLevel(logging.INFO)  # set level of logger
-formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")  # set format of logger
-logging.Formatter.converter = time.gmtime  # convert time in logger to UCT
-filehandler = logging.FileHandler(log_file_name + '.log', 'w+')  # create log file
-filehandler.setFormatter(formatter)  # add format to log file
-log.addHandler(filehandler)  # link log file to logger
-streamhandler_slack = logging.StreamHandler(log_stream)  # add log stream to logger
-streamhandler_slack.setFormatter(formatter)  # add format to log stream
-log.addHandler(streamhandler_slack)  # link logger to log stream
-logger = saguaro_pipe.MyLogger(log, log_stream, 'css')  # load logger handler
+log_file_name = f'{css.log_path()}/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+logger = saguaro_logging.initialize_logger(log_file_name)
 
 logger.critical('Median watcher started.')
 
-read_path = '/home/data/css/G96/' + datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
+read_path = css.incoming_path(date)
 read_dir = False
 while read_dir is False:
     if not os.path.exists(read_path):
@@ -242,13 +227,13 @@ while read_dir is False:
         if done:
             logger.critical('Scheduled time reached.')
             logger.critical('No data ingested.')
-            logging.shutdown()
+            logger.shutdown()
             sys.exit()
         else:
             time.sleep(1)
     else:
         read_dir = True
-write_path = '/home/saguaro/data/css/raw/' + datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%Y/%y%b%d')
+write_path = css.read_path(date)  # median watcher writes the stacked images to the pipeline's read_path
 if not os.path.exists(write_path):
     os.makedirs(write_path)
 
@@ -292,7 +277,7 @@ files_sex = len(glob.glob(read_path + '/G96*_N*.sext.gz')) + len(glob.glob(read_
 files_head = len(glob.glob(read_path + '/G96*_N*.arch_h')) + len(glob.glob(read_path + '/G96*_S*.arch_h'))
 logger.critical(f'There seem to be {files_sex - files_raw:d} images missing based on the SExtractor files.')
 logger.critical(f'There seem to be {files_head - files_raw:d} images missing based on the header files.')
-files_trans = glob.glob(css.write_path() + css.red_path(date) + '/G96*Scorr.fits.fz')
+files_trans = glob.glob(css.red_path(date) + '/G96*Scorr.fits.fz')
 candidates = []
 for f in files_trans:
     with fits.open(f) as hdr:
@@ -301,10 +286,6 @@ plt.hist(candidates, bins=np.arange(0, 9000, 100))
 plt.title('Candidate summary for ' + date)
 plt.xlabel('Number of candidates per field')
 plt.savefig(log_file_name + '.pdf')
-my_file = {'file': (log_file_name + '.pdf', open(log_file_name + '.pdf', 'rb'), 'pdf')}
-with open('/home/saguaro/software/saguaro_slack.txt', 'r') as f:
-    slack_token = f.readline().rstrip()
-payload = {"filename": log_file_name + '.pdf', "token": slack_token, "channels": ['#pipeline']}
-requests.post("https://slack.com/api/files.upload", params=payload, files=my_file)
-logging.shutdown()
+logger.slack_client.files_upload(channels=['#pipeline'], file=log_file_name)
+logger.shutdown()
 sys.exit()
