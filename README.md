@@ -1,4 +1,4 @@
-# Pipeline
+# SAGUARO Pipeline
 
 The SAUARO pipeline is designed to run every night, automatically started by a cron job, to reduce incoming data.
 
@@ -36,7 +36,15 @@ Finally, install the pipeline in that environment:
 pip install git+https://github.com/SAGUARO-MMA/Pipeline
 ```
 
-This will also install [ZOGY](https://github.com/KerryPaterson/ZOGY), which has non-Python dependencies: [PSFEx](http://www.astromatic.net/software/psfex), [Source Extractor](http://www.astromatic.net/software/sextractor), and [SWarp](http://www.astromatic.net/software/swarp). The pipeline itself also requres [CFITSIO](https://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html), which contains `fpack` and `funpack`. These can all be installed with APT: `sudo apt install psfex sextractor swarp libcfitsio-bin`.
+This will also install [ZOGY](https://github.com/KerryPaterson/ZOGY), which has non-Python dependencies: [PSFEx](http://www.astromatic.net/software/psfex), [Source Extractor](http://www.astromatic.net/software/sextractor), and [SWarp](http://www.astromatic.net/software/swarp). The pipeline itself also requres [CFITSIO](https://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html), which contains `fpack` and `funpack`. These can all be installed with APT:
+```bash
+sudo apt install psfex sextractor swarp libcfitsio-bin
+```
+
+You might also have to install some or all of the following linear algebra packages, depending on what comes with your system:
+```bash
+sudo apt install libatlas-base-dev liblapack-dev libblas-dev libfftw3-devlibplplot-dev
+```
 
 When using the pipeline in the future, make sure to activate the environment first:
 ```bash
