@@ -41,6 +41,13 @@ This will also install [ZOGY](https://github.com/KerryPaterson/ZOGY), which has 
 sudo apt install psfex sextractor swarp libcfitsio-bin
 ```
 
+APT installs some of these with slightly different names than the pipeline uses, so make these aliases:
+```bash
+cd /usr/bin/
+sudo ln -s sextractor sex
+sudo ln -s SWarp swarp
+```
+
 You might also have to install some or all of the following linear algebra packages, depending on what comes with your system:
 ```bash
 sudo apt install libatlas-base-dev liblapack-dev libblas-dev libfftw3-devlibplplot-dev
