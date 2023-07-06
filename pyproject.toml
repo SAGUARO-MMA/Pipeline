@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools", "setuptools_scm[toml]"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "saguaro-pipeline"
+version = "2.0.0"
+readme = "README.md"
+license.file = "LICENSE"
+dynamic = ["version", "dependencies"]
+
+[project.scripts]
+median-watcher = "saguaro_pipeline.median_watcher:cli"
+saguaro-pipe = "saguaro_pipeline.saguaro_pipe:cli"
+
+[tool.setuptools.dynamic]
+dependencies.file = "requirements.txt"
+
+[tool.setuptools_scm]

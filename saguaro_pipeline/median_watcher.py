@@ -4,7 +4,7 @@
 Script to create median images from the 4 CSS images per field.
 """
 
-__version__ = "1.1"  # last updated 15/10/2021
+__version__ = "2.0.0"  # last updated 2023-07-06
 
 import sys
 import numpy as np
@@ -21,11 +21,9 @@ import uuid
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
-import css
+from . import css, saguaro_logging, saguaro_pipe
 import shutil
-import saguaro_logging
-import saguaro_pipe
-import settings
+import importlib.resources
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -130,11 +128,12 @@ def action(event, date, read_path, write_path, field):
                             unique_dir + out_file.replace('.fits', '_mask.head'))
     if len(combine) > 1:
         masks = [x.replace('.fits', '_mask.fits') for x in combine]
-        subprocess.call(['swarp'] + combine + ['-c', os.environ['ZOGYHOME'] + '/Config/swarp_css.config', '-IMAGE_SIZE',
+        swarp_config_file = str(importlib.resources.files('zogy').joinpath('Config/swarp_css.config'))
+        subprocess.call(['swarp'] + combine + ['-c', swarp_config_file, '-IMAGE_SIZE',
                                                '5280,5280', '-IMAGEOUT_NAME', unique_dir + out_file, '-SUBTRACT_BACK',
                                                'YES', '-GAIN_KEYWORD', 'GAIN', '-BACK_SIZE', '256', '-BACK_FILTERSIZE',
                                                '3', '-FSCALASTRO_TYPE', 'VARIABLE', '-FSCALE_KEYWORD', 'FLXSCALE'])
-        subprocess.call(['swarp'] + masks + ['-c', os.environ['ZOGYHOME'] + 'Config/swarp_css.config', '-IMAGE_SIZE',
+        subprocess.call(['swarp'] + masks + ['-c', swarp_config_file, '-IMAGE_SIZE',
                                              '5280,5280', '-IMAGEOUT_NAME',
                                              unique_dir + out_file.replace('.fits', '_mask.fits'), '-SUBTRACT_BACK',
                                              'NO', '-GAIN_DEFAULT', '1', '-COMBINE_TYPE', 'SUM'])
@@ -165,7 +164,7 @@ def action(event, date, read_path, write_path, field):
         subprocess.call(['fpack', '-D', '-Y', '-g', unique_dir + out_file.replace('.fits', '_mask.fits')])
         subprocess.call(['mv', unique_dir + out_file + '.fz', write_path])
         subprocess.call(['mv', unique_dir + out_file.replace('.fits', '_mask.fits') + '.fz', write_path])
-        os.chdir(settings.ROOT_PATH)
+        os.chdir(os.environ['SAGUARO_ROOT'])
         subprocess.call(['rm', '-r', unique_dir])
         print('Created ' + out_file)
     ncombine.append(len(combine))
@@ -201,91 +200,92 @@ class FileWatcher(FileSystemEventHandler, object):
             action(event, self._date, self._read_path, self._write_path, field)
 
 
-global field_list, ncombine, logger, bad_images, missing_head
+def cli():
+    global field_list, ncombine, logger, bad_images, missing_head
 
-try:
-    mode = sys.argv[1]
-except:
-    mode = False
+    try:
+        mode = sys.argv[1]
+    except:
+        mode = False
 
-try:
-    date = sys.argv[2]
-except:
-    date = datetime.datetime.utcnow().strftime('%Y/%m/%d')
+    try:
+        date = sys.argv[2]
+    except:
+        date = datetime.datetime.utcnow().strftime('%Y/%m/%d')
 
-log_file_name = f'{css.log_path()}/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-logger = saguaro_logging.initialize_logger(log_file_name)
+    log_file_name = f'{css.log_path()}/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    logger = saguaro_logging.initialize_logger(log_file_name)
 
-logger.critical('Median watcher started.')
+    logger.critical('Median watcher started.')
 
-read_path = css.incoming_path(date)
-read_dir = False
-while read_dir is False:
-    if not os.path.exists(read_path):
-        print('waiting for directory to be created...')
-        done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
-        if done:
-            logger.critical('Scheduled time reached.')
-            logger.critical('No data ingested.')
-            logger.shutdown()
-            sys.exit()
+    read_path = css.incoming_path(date)
+    read_dir = False
+    while read_dir is False:
+        if not os.path.exists(read_path):
+            print('waiting for directory to be created...')
+            done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
+            if done:
+                logger.critical('Scheduled time reached.')
+                logger.critical('No data ingested.')
+                logger.shutdown()
+                sys.exit()
+            else:
+                time.sleep(1)
         else:
-            time.sleep(1)
-    else:
-        read_dir = True
-write_path = css.read_path(date)  # median watcher writes the stacked images to the pipeline's read_path
-if not os.path.exists(write_path):
-    os.makedirs(write_path)
+            read_dir = True
+    write_path = css.read_path(date)  # median watcher writes the stacked images to the pipeline's read_path
+    if not os.path.exists(write_path):
+        os.makedirs(write_path)
 
-field_list = []
-ncombine = []
-bad_images = 0
-missing_head = 0
+    field_list = []
+    ncombine = []
+    bad_images = 0
+    missing_head = 0
 
-if mode:  # to rerun all data
-    files = glob.glob(read_path + '/G96*.calb.fz')
-    for f in files:
-        field = check_field(f)
-        if field:
-            action(f, date, read_path, write_path, field)
-else:  # normal real-time reduction
-    observer = Observer()
-    observer.schedule(FileWatcher(date, read_path, write_path), read_path, recursive=False)
-    observer.start()
-    while True:
-        done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
-        if done:
-            logger.critical('Scheduled time reached.')
-            observer.stop()
-            observer.join()
-            break
-        else:
-            time.sleep(1)
+    if mode:  # to rerun all data
+        files = glob.glob(read_path + '/G96*.calb.fz')
+        for f in files:
+            field = check_field(f)
+            if field:
+                action(f, date, read_path, write_path, field)
+    else:  # normal real-time reduction
+        observer = Observer()
+        observer.schedule(FileWatcher(date, read_path, write_path), read_path, recursive=False)
+        observer.start()
+        while True:
+            done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
+            if done:
+                logger.critical('Scheduled time reached.')
+                observer.stop()
+                observer.join()
+                break
+            else:
+                time.sleep(1)
 
-ncombine = np.asarray(ncombine)
-logger.critical(f'''Median watcher summary:
-{len(ncombine):d} fields observed,
-{len(ncombine[ncombine == 4]):d} medians made with 4 images,
-{len(ncombine[ncombine == 3]):d} medians made with 3 images,
-{len(ncombine[ncombine == 2]):d} medians made with 2 images,
-{len(ncombine[ncombine == 1]):d} medians made with 1 image,
-{len(ncombine[ncombine == 0]):d} medians not made,
-{bad_images:d} images not used due to bad weather.
-''')
-files_raw = len(glob.glob(read_path + '/G96*_N*.calb.fz')) + len(glob.glob(read_path + '/G96*_S*.calb.fz'))
-files_sex = len(glob.glob(read_path + '/G96*_N*.sext.gz')) + len(glob.glob(read_path + '/G96*_S*.sext.gz'))
-files_head = len(glob.glob(read_path + '/G96*_N*.arch_h')) + len(glob.glob(read_path + '/G96*_S*.arch_h'))
-logger.critical(f'There seem to be {files_sex - files_raw:d} images missing based on the SExtractor files.')
-logger.critical(f'There seem to be {files_head - files_raw:d} images missing based on the header files.')
-files_trans = glob.glob(css.red_path(date) + '/G96*Scorr.fits.fz')
-candidates = []
-for f in files_trans:
-    with fits.open(f) as hdr:
-        candidates.append(hdr[1].header['T-NTRANS'])
-plt.hist(candidates, bins=np.arange(0, 9000, 100))
-plt.title('Candidate summary for ' + date)
-plt.xlabel('Number of candidates per field')
-plt.savefig(log_file_name + '.pdf')
-logger.slack_client.files_upload(channels=['#pipeline'], file=log_file_name)
-logger.shutdown()
-sys.exit()
+    ncombine = np.asarray(ncombine)
+    logger.critical(f'''Median watcher summary:
+    {len(ncombine):d} fields observed,
+    {len(ncombine[ncombine == 4]):d} medians made with 4 images,
+    {len(ncombine[ncombine == 3]):d} medians made with 3 images,
+    {len(ncombine[ncombine == 2]):d} medians made with 2 images,
+    {len(ncombine[ncombine == 1]):d} medians made with 1 image,
+    {len(ncombine[ncombine == 0]):d} medians not made,
+    {bad_images:d} images not used due to bad weather.
+    ''')
+    files_raw = len(glob.glob(read_path + '/G96*_N*.calb.fz')) + len(glob.glob(read_path + '/G96*_S*.calb.fz'))
+    files_sex = len(glob.glob(read_path + '/G96*_N*.sext.gz')) + len(glob.glob(read_path + '/G96*_S*.sext.gz'))
+    files_head = len(glob.glob(read_path + '/G96*_N*.arch_h')) + len(glob.glob(read_path + '/G96*_S*.arch_h'))
+    logger.critical(f'There seem to be {files_sex - files_raw:d} images missing based on the SExtractor files.')
+    logger.critical(f'There seem to be {files_head - files_raw:d} images missing based on the header files.')
+    files_trans = glob.glob(css.red_path(date) + '/G96*Scorr.fits.fz')
+    candidates = []
+    for f in files_trans:
+        with fits.open(f) as hdr:
+            candidates.append(hdr[1].header['T-NTRANS'])
+    plt.hist(candidates, bins=np.arange(0, 9000, 100))
+    plt.title('Candidate summary for ' + date)
+    plt.xlabel('Number of candidates per field')
+    plt.savefig(log_file_name + '.pdf')
+    logger.slack_client.files_upload(channels=['#pipeline'], file=log_file_name)
+    logger.shutdown()
+    sys.exit()

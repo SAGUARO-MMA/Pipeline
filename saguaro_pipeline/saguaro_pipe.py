@@ -4,7 +4,7 @@
 Pipeline for real-time data reduction and image subtraction.
 """
 
-__version__ = "1.5"  # last updated 03/05/2022
+__version__ = "2.0.0"  # last updated 2023-07-06
 
 import argparse
 import datetime
@@ -23,14 +23,13 @@ from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
 from acstools.satdet import detsat, make_mask
 import gc
-import saguaro_logging
 import uuid
 import traceback
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
 import zogy
-import ingestion
+from . import ingestion, saguaro_logging
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()
@@ -445,7 +444,7 @@ def main(telescope=None, date=None, cpu=None):
         sys.exit(-1)
 
 
-if __name__ == "__main__":
+def cli():
     params = argparse.ArgumentParser(description='User parameters.')
     params.add_argument('--telescope', default=None, help='Telescope of data.')  # telescope argument required
     params.add_argument('--date', default=None, help='Date of files to process.')  # optional date argument
