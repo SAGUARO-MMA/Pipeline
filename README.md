@@ -36,9 +36,7 @@ Finally, install the pipeline in that environment:
 pip install git+https://github.com/SAGUARO-MMA/Pipeline
 ```
 
-This will also install [ZOGY](https://github.com/KerryPaterson/ZOGY), which has non-Python dependencies: [PSFEx](http://www.astromatic.net/software/psfex), [Source Extractor](http://www.astromatic.net/software/sextractor), and [SWarp](http://www.astromatic.net/software/swarp). You have to install these separately.
-
-Lastly, the pipeline requres [CFITSIO](https://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html), which contains `fpack` and `funpack`. This can be installed with APT: `sudo apt install libcfitsio-bin`.
+This will also install [ZOGY](https://github.com/KerryPaterson/ZOGY), which has non-Python dependencies: [PSFEx](http://www.astromatic.net/software/psfex), [Source Extractor](http://www.astromatic.net/software/sextractor), and [SWarp](http://www.astromatic.net/software/swarp). The pipeline itself also requres [CFITSIO](https://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html), which contains `fpack` and `funpack`. This can all be installed with APT: `sudo apt install psfex sextractor swarp libcfitsio-bin`.
 
 When using the pipeline in the future, make sure to activate the environment first:
 Activate that environment:
