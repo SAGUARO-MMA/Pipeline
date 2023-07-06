@@ -23,6 +23,7 @@ from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
 from . import css, saguaro_logging, saguaro_pipe
 import shutil
+import importlib.resources
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -127,11 +128,12 @@ def action(event, date, read_path, write_path, field):
                             unique_dir + out_file.replace('.fits', '_mask.head'))
     if len(combine) > 1:
         masks = [x.replace('.fits', '_mask.fits') for x in combine]
-        subprocess.call(['swarp'] + combine + ['-c', os.environ['ZOGYHOME'] + '/Config/swarp_css.config', '-IMAGE_SIZE',
+        swarp_config_file = str(importlib.resources.files('zogy').joinpath('Config/swarp_css.config'))
+        subprocess.call(['swarp'] + combine + ['-c', swarp_config_file, '-IMAGE_SIZE',
                                                '5280,5280', '-IMAGEOUT_NAME', unique_dir + out_file, '-SUBTRACT_BACK',
                                                'YES', '-GAIN_KEYWORD', 'GAIN', '-BACK_SIZE', '256', '-BACK_FILTERSIZE',
                                                '3', '-FSCALASTRO_TYPE', 'VARIABLE', '-FSCALE_KEYWORD', 'FLXSCALE'])
-        subprocess.call(['swarp'] + masks + ['-c', os.environ['ZOGYHOME'] + 'Config/swarp_css.config', '-IMAGE_SIZE',
+        subprocess.call(['swarp'] + masks + ['-c', swarp_config_file, '-IMAGE_SIZE',
                                              '5280,5280', '-IMAGEOUT_NAME',
                                              unique_dir + out_file.replace('.fits', '_mask.fits'), '-SUBTRACT_BACK',
                                              'NO', '-GAIN_DEFAULT', '1', '-COMBINE_TYPE', 'SUM'])
