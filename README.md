@@ -88,7 +88,7 @@ In order to run the pipeline automatically, we use the following cronjobs:
 30 17 * * * /dataraid6/sassy/anaconda/envs/saguaro-mma/bin/saguaro-pipe --telescope css --cpu 16 > saguaro_pipe.log 2>&1
 ```
 
-Then, because we don't want to fill up the disk, we do a weekly backup of the data products to a network drive:
+Then, because we don't want to fill up the disk, we do a weekly backup of the data products to a network drive (as root):
 ```
 @weekly cd /dataraid6/sassy/data/css/; rsync -avz log raw red /mnt/dsand/saguaro/data/css > /home/sassy/saguaro_cleanup.log 2>&1; rm -r log/* raw/* red/* tmp/*
 @weekly cd /dataraid6/sassy/; rsync -avz css_incoming /mnt/dsand/saguaro/ > /home/sassy/saguaro_incoming_cleanup.log 2>&1; rm -r css_incoming/*
