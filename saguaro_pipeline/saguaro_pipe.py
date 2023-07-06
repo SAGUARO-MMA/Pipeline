@@ -4,7 +4,7 @@
 Pipeline for real-time data reduction and image subtraction.
 """
 
-__version__ = "1.5"  # last updated 03/05/2022
+__version__ = "2.0.0"  # last updated 2023-07-06
 
 import argparse
 import datetime

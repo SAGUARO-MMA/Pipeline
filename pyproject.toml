@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "saguaro-pipeline"
+version = "2.0.0"
 readme = "README.md"
 license.file = "LICENSE"
 dynamic = ["version", "dependencies"]
