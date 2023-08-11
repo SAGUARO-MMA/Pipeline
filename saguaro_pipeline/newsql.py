@@ -61,18 +61,43 @@ def get_or_create_target(ra, dec, radius=2.):
     return res
 
 
-def ingestcandidates(number, filename, elongation, ra, dec, fwhm, snr, mag, magerr, rawfilename, obsdate, field,
-                     classification, cx, cy, cz, htm16id, targetid, mjdmid, mlscore, mlbogus, mlreal, ncomb):
+def ingestcandidates(number, elongation, ra, dec, fwhm, snr, mag, magerr, classification,
+                     cx, cy, cz, targetid, mlscore, mlbogus, mlreal, obsid, dateobs):
     db = Dictdb()
-    db.query(f"INSERT INTO candidates (candidatenumber, filename, elongation, ra, dec, fwhm, snr, mag, magerr, "
-             f"rawfilename, obsdate, field, classification, cx, cy, cz, htm16id, targetid, mjdmid, mlscore, mlscore_bogus, mlscore_real, ncombine) "
-             f"VALUES ({number}, '{filename}', {elongation}, {ra}, {dec}, {fwhm}, {snr}, {mag}, {magerr}, "
-             f"'{rawfilename}', '{obsdate}', '{field}', {classification}, {cx}, {cy}, {cz}, {htm16id}, {targetid}, "
-             f"{mjdmid}, {mlscore}, {mlbogus}, {mlreal}, {ncomb}) RETURNING id;")
+    db.query(f"INSERT INTO candidates (candidatenumber, elongation, ra, dec, fwhm, snr, mag, magerr, classification, "
+             f"cx, cy, cz, target_id, mlscore, mlscore_bogus, mlscore_real, observation_record_id) "
+             f"VALUES ({number}, {elongation}, {ra}, {dec}, {fwhm}, {snr}, {mag}, {magerr}, {classification}, "
+             f"{cx}, {cy}, {cz}, {targetid}, {mlscore}, {mlbogus}, {mlreal}, {obsid}) RETURNING id;")
     # the .item() is needed to convert any np.float32 to np.float64, which is JSON serializable
     reduced_datum_value = {'magnitude': mag.item(), 'error': magerr.item(), 'filter': 'Clear', 'instrument': 'CSS'}
     db.query(f"INSERT INTO tom_dataproducts_reduceddatum (data_type, source_name, source_location, timestamp, value, "
              f"target_id) VALUES ('photometry', 'SAGUARO pipeline', 'SAGUARO pipeline', "
-             f"'{Time(mjdmid, format='mjd').iso}', '{json.dumps(reduced_datum_value)}', {targetid:d})")
+             f"'{dateobs.iso}', '{json.dumps(reduced_datum_value)}', {targetid:d})")
     db.commit()
     db.close()
+
+
+def add_observation_record(basefile, hdr):
+    midnight_utc = Time(hdr['DATE-OBS'])
+    dateobs = Time(hdr['DATE-OBS'] + ' ' + hdr['TIME-OBS'])
+    field = hdr['OBJECT']
+    parameters = {'ncombine': hdr['NCOMBINE']}
+
+    db = Dictdb()
+    res = db.queryfetchall(f"SELECT id, parameters, status "
+                           f"FROM tom_surveys_surveyobservationrecord "
+                           f"WHERE survey_field_id = '{field}' "
+                           f"AND created > '{midnight_utc.iso}' "
+                           f"AND created < '{(midnight_utc + 1).iso}'")
+    if res and res['status'][0] == 'PENDING':  # requested observation
+        parameters = res['parameters'][0].update(parameters)
+        db.query(f"UPDATE tom_surveys_surveyobservationrecord "
+                 f"SET parameters='{json.dumps(parameters)}', observation_id='{basefile}', status='COMPLETED', "
+                 f"scheduled_start='{dateobs.iso}', modified=NOW() "
+                 f"WHERE id={res['id'][0]}")
+    else:  # serendipitous observation
+        res = db.queryfetchall(f"INSERT INTO tom_surveys_surveyobservationrecord "
+                               f"VALUES ('CSS', '{json.dumps(parameters)}', '{basefile}', 'COMPLETED', '{dateobs.iso}', "
+                               f"NULL, NOW(), NOW(), {field}, NULL) "
+                               f"RETURNING id")
+    return res['id'][0], dateobs
