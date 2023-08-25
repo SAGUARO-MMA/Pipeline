@@ -81,8 +81,13 @@ def add_observation_record(basefile, hdr):
     midnight_utc = Time(hdr['DATE-OBS'])
     dateobs = Time(hdr['DATE-OBS'] + ' ' + hdr['TIME-OBS'])
     field = hdr['OBJECT']
-    parameters = {'ncombine': hdr['NCOMBINE']}
-
+    parameters = {
+        'pos_angle': 0.,
+        'depth': hdr['T-LMAG'],
+        'depth_unit': 'ab_mag',
+        'band': 'open',
+        'ncombine': hdr['NCOMBINE'],
+    }
     db = Dictdb()
     res = db.queryfetchall(f"SELECT id, parameters, status "
                            f"FROM tom_surveys_surveyobservationrecord "
