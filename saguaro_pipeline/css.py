@@ -17,7 +17,7 @@ from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
 
 from . import saguaro_pipe
-from importlib.resources import files
+from importlib_resources import files
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()
