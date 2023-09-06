@@ -245,8 +245,6 @@ def action(item_list):
     reduced, comment = tel.science_process(file, unique_dir, log_file_name)  # submit image for reduction
     q.put(logger.info('Ending reduction for '+file+' '+comment))
     ref = tel.find_ref(reduced)  # find reference image
-    subprocess.call(['cp', '-r', zogy_path + '/' + C.cfg_dir, '.'])  # copy over needed zogy config files
-    q.put(logger.info('cp -r '+zogy_path+'/'+C.cfg_dir+' .'))
     try:
         if ref:  # submit as subtraction job
             q.put(logger.info("Reference found. Starting zogy subtraction for "+reduced))
@@ -313,11 +311,9 @@ def main(telescope=None, date=None, cpu=None):
         print('No telescope given, please give telescope and re-run.')
         sys.exit(-1)
     else:
-        global zogy_path, tel, C
-    zogy_path = os.environ['ZOGYHOME']
+        global tel
     try:
         tel = importlib.import_module(f'{__package__}.{telescope}')  # import telescope setting file
-        C = importlib.import_module('Settings.Constants_' + telescope)
     except ImportError:
         print('No such telescope file, please check that the file is in the same directory as the pipeline.')
         sys.exit(-1)
