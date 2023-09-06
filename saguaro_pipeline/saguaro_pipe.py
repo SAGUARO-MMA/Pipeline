@@ -28,7 +28,7 @@ import traceback
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
-import zogy
+from zogy import zogy
 from . import ingestion, saguaro_logging
 
 warnings.simplefilter('ignore', category=AstropyWarning)
