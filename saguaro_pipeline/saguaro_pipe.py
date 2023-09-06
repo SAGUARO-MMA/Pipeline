@@ -99,7 +99,7 @@ def scheduled_exit(date, telescope):
     If the current time has past the scheduled exit time and before the
     scheduled start time, return True. Otherwise return False.
     """
-    tel = importlib.import_module(telescope)
+    tel = importlib.import_module(f'{__package__}.{telescope}')
     if (date + datetime.timedelta(hours=tel.time_zone())).hour == 8:
         # if current is after scheduled exit but before next run, exit
         return True
@@ -111,7 +111,7 @@ def mask_create(science_file, telescope, unique_dir, Red, mask_bp, header, comme
     """
     Creates a mask file for an image.
     """
-    tel = importlib.import_module(telescope)
+    tel = importlib.import_module(f'{__package__}.{telescope}')
     mask_infnan = ~np.isfinite(Red)
     mask_bp[mask_infnan & (mask_bp != 32)] = 1
     Red[mask_infnan] = 0
@@ -316,7 +316,7 @@ def main(telescope=None, date=None, cpu=None):
         global zogy_path, tel, C
     zogy_path = os.environ['ZOGYHOME']
     try:
-        tel = importlib.import_module(telescope)  # import telescope setting file
+        tel = importlib.import_module(f'{__package__}.{telescope}')  # import telescope setting file
         C = importlib.import_module('Settings.Constants_' + telescope)
     except ImportError:
         print('No such telescope file, please check that the file is in the same directory as the pipeline.')
