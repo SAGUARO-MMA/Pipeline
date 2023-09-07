@@ -23,7 +23,7 @@ from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
 from . import css, saguaro_logging, saguaro_pipe
 import shutil
-import importlib.resources
+from importlib_resources import files
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -128,7 +128,7 @@ def action(event, date, read_path, write_path, field):
                             unique_dir + out_file.replace('.fits', '_mask.head'))
     if len(combine) > 1:
         masks = [x.replace('.fits', '_mask.fits') for x in combine]
-        swarp_config_file = str(importlib.resources.files('zogy').joinpath('Config/swarp_css.config'))
+        swarp_config_file = str(files('zogy').joinpath('Config/swarp_css.config'))
         subprocess.call(['swarp'] + combine + ['-c', swarp_config_file, '-IMAGE_SIZE',
                                                '5280,5280', '-IMAGEOUT_NAME', unique_dir + out_file, '-SUBTRACT_BACK',
                                                'YES', '-GAIN_KEYWORD', 'GAIN', '-BACK_SIZE', '256', '-BACK_FILTERSIZE',
