@@ -101,9 +101,9 @@ def add_observation_record(basefile, hdr):
                  f"scheduled_start='{dateobs.iso}', modified=NOW() "
                  f"WHERE id={res['id'][0]}")
     elif not res:  # serendipitous observation
-        res = db.queryfetchall(f"INSERT INTO tom_surveys_surveyobservationrecord "
-                               f"VALUES ('CSS', '{json.dumps(parameters)}', '{basefile}', 'COMPLETED', '{dateobs.iso}', "
-                               f"NULL, NOW(), NOW(), '{field}', NULL) "
-                               f"RETURNING id")
+        res = db.queryfetchall(f"INSERT INTO tom_surveys_surveyobservationrecord (facility, parameters, "
+                               f"observation_id, status, scheduled_start, created, modified, survey_field_id) "
+                               f"VALUES ('CSS', '{json.dumps(parameters)}', '{basefile}', 'COMPLETED', "
+                               f"'{dateobs.iso}', NOW(), NOW(), '{field}') RETURNING id")
     # otherwise it was already ingested (partially or completely), so just return the ID and dateobs
     return res['id'][0], dateobs
