@@ -204,23 +204,18 @@ def ingestion(transCatalog, log=None):
     if log is not None:
         log.info('Ingestion: '+str(len(image_data)) + ' candidates found.')
     print(str(len(image_data)) + ' candidates found.')
-    rawfile = transCatalog.replace('_red_trans.fits', '.arch')
     basefile = os.path.basename(transCatalog)
     pngpath_main = f'{os.environ["THUMB_PATH"]}/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
-    resfile, resnumber = newsql.pipecandmatch(basefile)
+    observation_id, dateobs = newsql.add_observation_record(basefile, hdr)
+    resnumber = newsql.pipecandmatch(observation_id)
     tpng, tml, tml_nn, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], [], [], []
-    print(resfile, len(resfile), len(image_data))
-    if len(resfile) == 0 or len(resfile) < len(image_data):
+    print(observation_id, len(resnumber), len(image_data))
+    if len(resnumber) < len(image_data):  # not fully ingested before
 
         # Moving Object Classification
         catalog=movingobjectcatalog(float(hdr['MJD']))
         ra, dec = radectodecimal(hdr['RA'], hdr['DEC'])
         filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
-
-        if hdr.get('MJDMID', -1.) == -1.:  # CSS uses -1 as a sentinel value
-            mmjd = hdr['MJD'] + hdr['EXPTIME'] / 2. / 86400.
-        else:
-            mmjd = hdr['MJDMID']
 
         pngpath = f"{pngpath_main}/{hdr['OBJECT']}"
         os.makedirs(pngpath, exist_ok=True)
@@ -303,13 +298,12 @@ def ingestion(transCatalog, log=None):
                 cy = np.sin(np.radians(ra)) * np.cos(np.radians(dec))
                 cz = np.sin(np.radians(dec))
 
-                newsql.ingestcandidates(row['NUMBER'], basefile, row['ELONGATION'], ra, dec, row['FWHM_TRANS'],
-                                        row['S2N'], row['MAG_PSF'], row['MAGERR_PSF'], rawfile, hdr['DATE-OBS'],
-                                        hdr['OBJECT'], classification, cx, cy, cz, -1, res['id'][0], mmjd, score,
-                                        score_bogus, score_real, hdr['NCOMBINE'])
+                newsql.ingestcandidates(row['NUMBER'], row['ELONGATION'], ra, dec, row['FWHM_TRANS'], row['S2N'],
+                                        row['MAG_PSF'], row['MAGERR_PSF'], classification, cx, cy, cz, res['id'][0],
+                                        score, score_bogus, score_real, observation_id, dateobs)
                 tcingest.append(time.time() - rowt0)
 
     tcomp = time.time() - imgt0
     if log is not None:
-        log.info('Ingestion: '+rawfile+'  Average time to make png, save png, run ml, target ingest,candidateingest,total candidates,'+ str(np.mean(tpng))+','+str(np.mean(tpngsave))+','+str(np.mean(tml))+','+str(np.mean(tml_nn))+','+str(np.mean(ttingest))+','+str(np.mean(tcingest))+','+str(len(tpng)))
-        log.info('Ingestion: Time to complete ' + rawfile + ': '+str(tcomp)+' '+str(len(image_data) / tcomp)+' cand/sec')
+        log.info('Ingestion: '+basefile+'  Average time to make png, save png, run ml, target ingest,candidateingest,total candidates,'+ str(np.mean(tpng))+','+str(np.mean(tpngsave))+','+str(np.mean(tml))+','+str(np.mean(tml_nn))+','+str(np.mean(ttingest))+','+str(np.mean(tcingest))+','+str(len(tpng)))
+        log.info('Ingestion: Time to complete ' + basefile + ': '+str(tcomp)+' '+str(len(image_data) / tcomp)+' cand/sec')

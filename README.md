@@ -21,10 +21,12 @@ You can now pip install the pipeline. First activate Anaconda, if you haven't al
 source /dataraid6/sassy/anaconda/bin/activate
 ```
 
-Then create a new environment and install pip:
+Then create a new Python 3.8[^1] environment and install pip:
 ```bash
-conda create -n saguaro-mma pip
+conda create -n saguaro-mma python=3.8 pip
 ```
+
+[^1]: Python 3.8 is required to support scikit-learn 0.22.1, which is what we used to produce the old machine-learning model.
 
 Activate that environment:
 ```bash
