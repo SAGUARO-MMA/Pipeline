@@ -89,18 +89,18 @@ def add_observation_record(basefile, hdr):
         'ncombine': hdr['NCOMBINE'],
     }
     db = Dictdb()
-    res = db.queryfetchall(f"SELECT id, parameters, status "
+    res = db.queryfetchall(f"SELECT id, parameters, observation_id, status "
                            f"FROM tom_surveys_surveyobservationrecord "
                            f"WHERE survey_field_id = '{field}' "
-                           f"AND created > '{midnight_utc.iso}' "
-                           f"AND created < '{(midnight_utc + 1).iso}'")
+                           f"AND scheduled_start > '{midnight_utc.iso}' "
+                           f"AND scheduled_start < '{(midnight_utc + 1).iso}'")
     if res and res['status'][0] == 'PENDING':  # requested observation
         parameters = res['parameters'][0].update(parameters)
         db.query(f"UPDATE tom_surveys_surveyobservationrecord "
                  f"SET parameters='{json.dumps(parameters)}', observation_id='{basefile}', status='COMPLETED', "
                  f"scheduled_start='{dateobs.iso}', modified=NOW() "
                  f"WHERE id={res['id'][0]}")
-    elif not res:  # serendipitous observation
+    elif not res or res['observation_id'][0] != basefile:  # new serendipitous observation
         res = db.queryfetchall(f"INSERT INTO tom_surveys_surveyobservationrecord (facility, parameters, "
                                f"observation_id, status, scheduled_start, created, modified, survey_field_id) "
                                f"VALUES ('CSS', '{json.dumps(parameters)}', '{basefile}', 'COMPLETED', "
