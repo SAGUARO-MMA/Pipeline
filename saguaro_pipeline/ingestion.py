@@ -206,17 +206,16 @@ def ingestion(transCatalog, log=None):
     print(str(len(image_data)) + ' candidates found.')
     basefile = os.path.basename(transCatalog)
     pngpath_main = f'{os.environ["THUMB_PATH"]}/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
-    resfile, resnumber = newsql.pipecandmatch(basefile)
+    observation_id, dateobs = newsql.add_observation_record(basefile, hdr)
+    resnumber = newsql.pipecandmatch(observation_id)
     tpng, tml, tml_nn, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], [], [], []
-    print(resfile, len(resfile), len(image_data))
-    if len(resfile) == 0 or len(resfile) < len(image_data):
+    print(observation_id, len(resnumber), len(image_data))
+    if len(resnumber) < len(image_data):  # not fully ingested before
 
         # Moving Object Classification
         catalog=movingobjectcatalog(float(hdr['MJD']))
         ra, dec = radectodecimal(hdr['RA'], hdr['DEC'])
         filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
-
-        observation_id, dateobs = newsql.add_observation_record(basefile, hdr)
 
         pngpath = f"{pngpath_main}/{hdr['OBJECT']}"
         os.makedirs(pngpath, exist_ok=True)

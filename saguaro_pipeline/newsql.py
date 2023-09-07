@@ -30,14 +30,14 @@ class Dictdb:
         self.conn.close()
 
 
-def pipecandmatch(basefile):
+def pipecandmatch(observation_id):
     db = Dictdb()
-    res = db.queryfetchall(f"SELECT filename, candidatenumber FROM candidates WHERE filename = '{basefile}';")
+    res = db.queryfetchall(f"SELECT candidatenumber FROM candidates WHERE observation_record_id={observation_id};")
     db.close()
     if res:
-        return res['filename'], res['candidatenumber']
+        return res['candidatenumber']
     else:
-        return [], []
+        return []
 
 
 def get_or_create_target(ra, dec, radius=2.):
@@ -100,9 +100,10 @@ def add_observation_record(basefile, hdr):
                  f"SET parameters='{json.dumps(parameters)}', observation_id='{basefile}', status='COMPLETED', "
                  f"scheduled_start='{dateobs.iso}', modified=NOW() "
                  f"WHERE id={res['id'][0]}")
-    else:  # serendipitous observation
+    elif not res:  # serendipitous observation
         res = db.queryfetchall(f"INSERT INTO tom_surveys_surveyobservationrecord "
                                f"VALUES ('CSS', '{json.dumps(parameters)}', '{basefile}', 'COMPLETED', '{dateobs.iso}', "
                                f"NULL, NOW(), NOW(), {field}, NULL) "
                                f"RETURNING id")
+    # otherwise it was already ingested (partially or completely), so just return the ID and dateobs
     return res['id'][0], dateobs
