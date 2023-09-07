@@ -58,8 +58,8 @@ def action(event, date, read_path, write_path, field):
     """
     t1 = datetime.datetime.utcnow()
     while True:
-        files = sorted(glob.glob(read_path + '/G96_*' + field + '*.calb.fz'))
-        if len(files) == 4:
+        images = sorted(glob.glob(read_path + '/G96_*' + field + '*.calb.fz'))
+        if len(images) == 4:
             break
         else:
             t2 = datetime.datetime.utcnow()
@@ -70,7 +70,7 @@ def action(event, date, read_path, write_path, field):
     t1 = datetime.datetime.utcnow()
     while True:
         headers = sorted(glob.glob(read_path + '/G96_*' + field + '*.arch_h'))
-        if len(headers) == len(files):
+        if len(headers) == len(images):
             break
         else:
             t2 = datetime.datetime.utcnow()
@@ -78,16 +78,16 @@ def action(event, date, read_path, write_path, field):
                 break
             else:
                 time.sleep(1)
-    logger.info('Number of files for field = ' + str(len(files)))
+    logger.info('Number of files for field = ' + str(len(images)))
     combine = []
     mjd = []
     back = []
     zp = []
     global bad_images
-    out_file = os.path.basename(files[0]).split('_00')[0] + '_med.fits'
+    out_file = os.path.basename(images[0]).split('_00')[0] + '_med.fits'
     unique_dir = f'{css.work_path(date)}/{uuid.uuid1().hex}/'
     os.makedirs(unique_dir)
-    for i, f in enumerate(files):
+    for i, f in enumerate(images):
         subprocess.call(['cp', f, unique_dir])
         try:
             header = fits.open(f.replace('calb.fz', 'arch_h'))[0].header
@@ -243,8 +243,8 @@ def cli():
     missing_head = 0
 
     if mode:  # to rerun all data
-        files = glob.glob(read_path + '/G96*.calb.fz')
-        for f in files:
+        images = glob.glob(read_path + '/G96*.calb.fz')
+        for f in images:
             field = check_field(f)
             if field:
                 action(f, date, read_path, write_path, field)
