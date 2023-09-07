@@ -222,7 +222,7 @@ def cli():
     read_dir = False
     while read_dir is False:
         if not os.path.exists(read_path):
-            print('waiting for directory to be created...')
+            print(f'waiting for directory {read_path} to be created...')
             done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
             if done:
                 logger.critical('Scheduled time reached.')

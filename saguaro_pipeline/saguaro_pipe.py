@@ -357,7 +357,7 @@ def main(telescope=None, date=None, cpu=None):
                 if done:
                     sys.exit()
                 else:
-                    print('waiting for directory to be created...')
+                    print(f'waiting for directory {read_path} to be created...')
                     time.sleep(1)
         else:
             read_dir = True
