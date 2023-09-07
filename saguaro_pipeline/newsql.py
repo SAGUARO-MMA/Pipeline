@@ -106,4 +106,6 @@ def add_observation_record(basefile, hdr):
                                f"VALUES ('CSS', '{json.dumps(parameters)}', '{basefile}', 'COMPLETED', "
                                f"'{dateobs.iso}', NOW(), NOW(), '{field}') RETURNING id")
     # otherwise it was already ingested (partially or completely), so just return the ID and dateobs
+    db.commit()
+    db.close()
     return res['id'][0], dateobs
