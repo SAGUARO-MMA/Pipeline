@@ -28,7 +28,7 @@ import traceback
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
-import zogy
+from zogy import zogy
 from . import ingestion, saguaro_logging
 
 warnings.simplefilter('ignore', category=AstropyWarning)
@@ -99,7 +99,7 @@ def scheduled_exit(date, telescope):
     If the current time has past the scheduled exit time and before the
     scheduled start time, return True. Otherwise return False.
     """
-    tel = importlib.import_module(telescope)
+    tel = importlib.import_module(f'{__package__}.{telescope}')
     if (date + datetime.timedelta(hours=tel.time_zone())).hour == 8:
         # if current is after scheduled exit but before next run, exit
         return True
@@ -111,7 +111,7 @@ def mask_create(science_file, telescope, unique_dir, Red, mask_bp, header, comme
     """
     Creates a mask file for an image.
     """
-    tel = importlib.import_module(telescope)
+    tel = importlib.import_module(f'{__package__}.{telescope}')
     mask_infnan = ~np.isfinite(Red)
     mask_bp[mask_infnan & (mask_bp != 32)] = 1
     Red[mask_infnan] = 0
@@ -245,8 +245,6 @@ def action(item_list):
     reduced, comment = tel.science_process(file, unique_dir, log_file_name)  # submit image for reduction
     q.put(logger.info('Ending reduction for '+file+' '+comment))
     ref = tel.find_ref(reduced)  # find reference image
-    subprocess.call(['cp', '-r', zogy_path + '/' + C.cfg_dir, '.'])  # copy over needed zogy config files
-    q.put(logger.info('cp -r '+zogy_path+'/'+C.cfg_dir+' .'))
     try:
         if ref:  # submit as subtraction job
             q.put(logger.info("Reference found. Starting zogy subtraction for "+reduced))
@@ -313,11 +311,9 @@ def main(telescope=None, date=None, cpu=None):
         print('No telescope given, please give telescope and re-run.')
         sys.exit(-1)
     else:
-        global zogy_path, tel, C
-    zogy_path = os.environ['ZOGYHOME']
+        global tel
     try:
-        tel = importlib.import_module(telescope)  # import telescope setting file
-        C = importlib.import_module('Settings.Constants_' + telescope)
+        tel = importlib.import_module(f'{__package__}.{telescope}')  # import telescope setting file
     except ImportError:
         print('No such telescope file, please check that the file is in the same directory as the pipeline.')
         sys.exit(-1)

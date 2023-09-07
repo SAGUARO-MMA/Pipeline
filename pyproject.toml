@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "saguaro-pipeline"
-version = "2.0.0"
+version = "2.0.1"
 readme = "README.md"
 license.file = "LICENSE"
-dynamic = ["version", "dependencies"]
+dynamic = ["dependencies"]
 
 [project.scripts]
 median-watcher = "saguaro_pipeline.median_watcher:cli"

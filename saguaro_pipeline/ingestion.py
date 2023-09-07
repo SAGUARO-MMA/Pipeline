@@ -10,7 +10,7 @@ from astropy.io import fits
 import numpy as np
 
 from . import newsql
-from importlib.resources import files
+from importlib_resources import files
 from tensorflow.keras import models
 
 
