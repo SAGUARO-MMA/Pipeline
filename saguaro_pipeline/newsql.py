@@ -65,7 +65,7 @@ def ingestcandidates(number, elongation, ra, dec, fwhm, snr, mag, magerr, classi
                      cx, cy, cz, targetid, mlscore, mlbogus, mlreal, obsid, dateobs):
     db = Dictdb()
     db.query(f"INSERT INTO candidates (candidatenumber, elongation, ra, dec, fwhm, snr, mag, magerr, classification, "
-             f"cx, cy, cz, target_id, mlscore, mlscore_bogus, mlscore_real, observation_record_id) "
+             f"cx, cy, cz, targetid, mlscore, mlscore_bogus, mlscore_real, observation_record_id) "
              f"VALUES ({number}, {elongation}, {ra}, {dec}, {fwhm}, {snr}, {mag}, {magerr}, {classification}, "
              f"{cx}, {cy}, {cz}, {targetid}, {mlscore}, {mlbogus}, {mlreal}, {obsid}) RETURNING id;")
     # the .item() is needed to convert any np.float32 to np.float64, which is JSON serializable
