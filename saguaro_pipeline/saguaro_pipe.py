@@ -416,7 +416,7 @@ def main(telescope=None, date=None, cpu=None):
                     while pool._cache != {}:
                         time.sleep(1)
                     q.put(logger.critical('Scheduled time reached, exiting pipeline.'))
-                    final_number = len(glob.glob(red_path + '*_trans.fits*'))
+                    final_number = len(glob.glob(red_path + '/*_trans.fits*'))
                     q.put(logger.critical(f'Summary: '
                                           f'{len(glob.glob(read_path + "/" + file_name)):d} input images found, '
                                           f'{final_number:d} successfully processed.'))
