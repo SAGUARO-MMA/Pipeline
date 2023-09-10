@@ -273,10 +273,8 @@ def cli():
     {bad_images:d} images not used due to bad weather.
     ''')
     files_raw = len(glob.glob(read_path + '/G96*_N*.calb.fz')) + len(glob.glob(read_path + '/G96*_S*.calb.fz'))
-    files_sex = len(glob.glob(read_path + '/G96*_N*.sext.gz')) + len(glob.glob(read_path + '/G96*_S*.sext.gz'))
     files_head = len(glob.glob(read_path + '/G96*_N*.arch_h')) + len(glob.glob(read_path + '/G96*_S*.arch_h'))
-    logger.critical(f'There seem to be {files_sex - files_raw:d} images missing based on the SExtractor files.')
-    logger.critical(f'There seem to be {files_head - files_raw:d} images missing based on the header files.')
+    logger.critical(f'Received {files_raw:d} calibrated images and {files_head:d} header files.')
     files_trans = glob.glob(css.red_path(date) + '/G96*Scorr.fits.fz')
     candidates = []
     for f in files_trans:
