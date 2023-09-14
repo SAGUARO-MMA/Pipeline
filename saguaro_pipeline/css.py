@@ -28,7 +28,7 @@ def incoming_path(date):
     Returns the absolute path containing the incoming raw data from this telescope.
     """
     data_date = datetime.datetime.strptime(date, '%Y/%m/%d').strftime('%y%b%d')
-    return f'{os.environ["SAGUARO_ROOT"]}/css_incoming/{data_date}'
+    return f'{write_path()}/inc/{data_date}'
 
 
 def read_path(date):
