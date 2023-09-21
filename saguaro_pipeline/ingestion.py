@@ -86,7 +86,6 @@ def movingobjectcatalog(obsmjd):
     with open(fnam) as f_catalog:
         for line in f_catalog:
             catalog_list.append(line.rstrip())
-    f_catalog.close()
     return catalog_list
 
 
@@ -197,10 +196,10 @@ def ingestion(transCatalog, log=None):
     model.compile(optimizer='Adam',metrics=['accuracy'],loss='binary_crossentropy')
     print('NN classifer loaded\n')
     imgt0 = time.time()
-    hdul = fits.open(transCatalog)
-    hdul.info()
-    hdr = hdul[1].header
-    image_data = hdul[1].data
+    with fits.open(transCatalog) as hdul:
+        hdul.info()
+        hdr = hdul[1].header
+        image_data = hdul[1].data
     if log is not None:
         log.info('Ingestion: '+str(len(image_data)) + ' candidates found.')
     print(str(len(image_data)) + ' candidates found.')

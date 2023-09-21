@@ -89,43 +89,41 @@ def action(event, date, read_path, write_path, field):
     os.makedirs(unique_dir)
     for i, f in enumerate(images):
         subprocess.call(['cp', f, unique_dir])
-        try:
-            header = fits.open(f.replace('calb.fz', 'arch_h'))[0].header
-            c = unique_dir + os.path.basename(f)
-            con = True
-        except:
+        header_filename = f.replace('calb.fz', 'arch_h')
+        if not os.path.exists(header_filename):
             logger.error('No header available for ' + f)
-            con = False
-        if con:
-            with fits.open(c) as hdr:
-                hdr.verify('fix+ignore')
-                header['CTYPE1'] = 'RA---TPV'
-                header['CTYPE2'] = 'DEC--TPV'
-                data = hdr[1].data
-                hdul = fits.HDUList([fits.PrimaryHDU(data, header)])
-                hdul.writeto(c.replace('.calb.fz', '.fits'), output_verify='fix+ignore')
-                try:
-                    stars = header['WCSMATCH']  # check image type
-                    t = header['MJD']
-                    if stars > 100:  # only continue if science image
-                        combine.append(c.replace('.calb.fz', '.fits'))
-                        mjd.append(t)
-                        back.append(np.median(data))
-                        zp.append(header['MAGZP'])
-                    else:
-                        bad_images += 1
-                except:
-                    logger.critical('Error with file ' + f)
-                with fits.open(css.bad_pixel_mask()) as bpm_hdr:
-                    mask_header = bpm_hdr[0].header
-                    data = bpm_hdr[0].data
-                    fits.writeto(c.replace('.calb.fz', '_mask.fits'), data, mask_header + header,
-                                 output_verify='fix+ignore')
-                with open(unique_dir + out_file.replace('.fits', '.head'), 'w') as swarp_head:
-                    for card in header.cards:
-                        swarp_head.write(str(card) + '\n')
-                shutil.copy(unique_dir + out_file.replace('.fits', '.head'),
-                            unique_dir + out_file.replace('.fits', '_mask.head'))
+            continue
+        header = fits.open(header_filename)[0].header
+        header['CTYPE1'] = 'RA---TPV'
+        header['CTYPE2'] = 'DEC--TPV'
+        c = unique_dir + os.path.basename(f)
+        with fits.open(c) as hdr:
+            hdr.verify('fix+ignore')
+            data = hdr[1].data
+        hdul = fits.HDUList([fits.PrimaryHDU(data, header)])
+        hdul.writeto(c.replace('.calb.fz', '.fits'), output_verify='fix+ignore')
+        try:
+            stars = header['WCSMATCH']  # check image type
+            t = header['MJD']
+            if stars > 100:  # only continue if science image
+                combine.append(c.replace('.calb.fz', '.fits'))
+                mjd.append(t)
+                back.append(np.median(data))
+                zp.append(header['MAGZP'])
+            else:
+                bad_images += 1
+        except:
+            logger.critical('Error with file ' + f)
+        with fits.open(css.bad_pixel_mask()) as bpm_hdr:
+            mask_header = bpm_hdr[0].header
+            data = bpm_hdr[0].data
+        fits.writeto(c.replace('.calb.fz', '_mask.fits'), data, mask_header + header,
+                     output_verify='fix+ignore')
+        with open(unique_dir + out_file.replace('.fits', '.head'), 'w') as swarp_head:
+            for card in header.cards:
+                swarp_head.write(str(card) + '\n')
+        shutil.copy(unique_dir + out_file.replace('.fits', '.head'),
+                    unique_dir + out_file.replace('.fits', '_mask.head'))
     if len(combine) > 1:
         masks = [x.replace('.fits', '_mask.fits') for x in combine]
         swarp_config_file = str(files('zogy').joinpath('Config/swarp_css.config'))
