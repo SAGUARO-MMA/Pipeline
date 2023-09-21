@@ -278,6 +278,7 @@ def cli():
     for f in files_trans:
         with fits.open(f) as hdr:
             candidates.append(hdr[1].header['T-NTRANS'])
+    logger.critical(f'Extracted {sum(candidates)} candidates in {len(candidates)} fields.')
     plt.hist(candidates, bins=np.arange(0, 9000, 100))
     plt.title('Candidate summary for ' + date)
     plt.xlabel('Number of candidates per field')
