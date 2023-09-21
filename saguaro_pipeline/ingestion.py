@@ -184,17 +184,23 @@ def imgscale(data):
     return new_data
 
 
+print('Loading classifier\n')
+with open(os.environ['ML_MODEL_OLD'], 'rb') as f:
+    classifier = pickle.load(f)
+print('Classifier loaded\n')
+print('Loading NN classifier\n')
+ml_model_new = os.getenv('ML_MODEL_NEW', files('saguaro_pipeline').joinpath('model_onlyscorr16_ml'))
+model = models.load_model(ml_model_new, compile=False)
+model.compile(optimizer='Adam', metrics=['accuracy'], loss='binary_crossentropy')
+print('NN classifer loaded\n')
+print('Loading moving object catalog\n')
+catalog = movingobjectcatalog(Time.now().mjd)
+print('Moving object catalog loaded\n')
+
+
 def ingestion(transCatalog, log=None):
     if log is not None:
         log.info('Ingesting catalog.')
-    print('Loading classifier\n')
-    classifier = pickle.load(open(os.environ['ML_MODEL_OLD'], 'rb'))
-    print('Classifier loaded\n')
-    print('Loading NN classifier\n')
-    ml_model_new = os.getenv('ML_MODEL_NEW', files('saguaro_pipeline').joinpath('model_onlyscorr16_ml'))
-    model = models.load_model(ml_model_new, compile=False)
-    model.compile(optimizer='Adam',metrics=['accuracy'],loss='binary_crossentropy')
-    print('NN classifer loaded\n')
     imgt0 = time.time()
     with fits.open(transCatalog) as hdul:
         hdul.info()
@@ -212,7 +218,6 @@ def ingestion(transCatalog, log=None):
     if len(resnumber) < len(image_data):  # not fully ingested before
 
         # Moving Object Classification
-        catalog=movingobjectcatalog(float(hdr['MJD']))
         ra, dec = radectodecimal(hdr['RA'], hdr['DEC'])
         filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
 
