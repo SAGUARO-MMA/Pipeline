@@ -6,7 +6,7 @@ Script to create median images from the 4 CSS images per field.
 
 __version__ = "2.0.0"  # last updated 2023-07-06
 
-import sys
+import argparse
 import numpy as np
 import os
 import datetime
@@ -199,15 +199,16 @@ class FileWatcher(FileSystemEventHandler, object):
 def cli():
     global field_list, ncombine, logger, bad_images, missing_head
 
-    try:
-        mode = sys.argv[1]
-    except:
-        mode = False
+    params = argparse.ArgumentParser(description='User parameters.')
+    params.add_argument('--date', default=None, help='Date of files to process.')  # optional date argument
+    args = params.parse_args()
 
-    try:
-        date = sys.argv[2]
-    except:
+    if args.date:
+        date = args.date
+        submit_all = True
+    else:
         date = datetime.datetime.utcnow().strftime('%Y/%m/%d')
+        submit_all = False
 
     log_file_name = f'{css.log_path()}/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
     logger = saguaro_logging.initialize_logger(log_file_name)
@@ -223,7 +224,7 @@ def cli():
             if done:
                 logger.critical('Scheduled time reached. No data ingested.')
                 logger.shutdown()
-                sys.exit()
+                return
             else:
                 time.sleep(1)
         else:
@@ -237,7 +238,7 @@ def cli():
     bad_images = 0
     missing_head = 0
 
-    if mode:  # to rerun all data
+    if submit_all:  # to rerun all data
         images = glob.glob(read_path + '/G96*.calb.fz')
         for f in images:
             field = check_field(f)
@@ -270,4 +271,3 @@ def cli():
     {bad_images:d} images not used due to bad weather.
     ''')
     logger.shutdown()
-    sys.exit()
