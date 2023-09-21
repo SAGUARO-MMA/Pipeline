@@ -30,6 +30,9 @@ from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
 from zogy import zogy
 from . import ingestion, saguaro_logging
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()
@@ -417,10 +420,20 @@ def main(telescope=None, date=None, cpu=None):
                         time.sleep(1)
                     q.put(logger.critical(''))
                     input_images = glob.glob(read_path + "/" + file_name)
-                    output_images = glob.glob(red_path + '/*_trans.fits*')
+                    output_files = glob.glob(red_path + '/*_trans.fits*')
+                    candidates = np.array([fits.getval(f, 'T-NTRANS', ext=1) for f in output_files])
                     q.put(logger.critical(f'Scheduled time reached. Pipeline summary:\n'
-                                          f'{len(input_images):d} input images found,\n'
-                                          f'{len(output_images):d} successfully processed.'))
+                                          f'{len(input_images):d} input images found.\n'
+                                          f'{len(output_files):d} successfully processed.\n'
+                                          f'{candidates.sum():d} candidates extracted.'))
+                    if np.sum(candidates):
+                        plt.hist(candidates, bins='auto')
+                        plt.title('Candidate summary for ' + date)
+                        plt.xlabel('Number of candidates per field')
+                        hist_file_name = log_file_name + '.pdf'
+                        plt.savefig(hist_file_name)
+                        logger.slack_client.files_upload(channels='pipeline', file=hist_file_name)
+
                     observer.stop()  # stop observer
                     observer.join()  # join observer
                     pool.close()  # close pool

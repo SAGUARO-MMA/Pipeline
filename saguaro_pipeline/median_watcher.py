@@ -24,9 +24,6 @@ import fnmatch as fn
 from . import css, saguaro_logging, saguaro_pipe
 import shutil
 from importlib_resources import files
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()
@@ -260,13 +257,8 @@ def cli():
                 time.sleep(1)
 
     ncombine = np.array(ncombine)
-    files_raw = glob.glob(read_path + '/G96*_N*.calb.fz') + glob.glob(read_path + '/G96*_S*.calb.fz')
-    files_head = glob.glob(read_path + '/G96*_N*.arch_h') + glob.glob(read_path + '/G96*_S*.arch_h')
-    files_trans = glob.glob(css.red_path(date) + '/G96*Scorr.fits.fz')
-    candidates = []
-    for f in files_trans:
-        with fits.open(f) as hdr:
-            candidates.append(hdr[1].header['T-NTRANS'])
+    files_raw = glob.glob(read_path + '/G96*_[NS]*.calb.fz')
+    files_head = glob.glob(read_path + '/G96*_[NS]*.arch_h')
     logger.critical(f'''Scheduled time reached. Median watcher summary:
     Received {len(files_raw):d} calibrated images and {len(files_head):d} header files.
     {len(ncombine):d} fields observed,
@@ -276,15 +268,6 @@ def cli():
     {np.sum(ncombine == 1):d} medians made with 1 image,
     {np.sum(ncombine == 0):d} medians not made,
     {bad_images:d} images not used due to bad weather.
-    Extracted {np.sum(candidates):d} candidates in {len(candidates):d} fields.
     ''')
-
-    if np.sum(candidates):
-        plt.hist(candidates, bins='auto')
-        plt.title('Candidate summary for ' + date)
-        plt.xlabel('Number of candidates per field')
-        hist_file_name = log_file_name + '.pdf'
-        plt.savefig(hist_file_name)
-        logger.slack_client.files_upload(channels='pipeline', file=hist_file_name)
     logger.shutdown()
     sys.exit()
