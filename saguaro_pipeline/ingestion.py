@@ -196,11 +196,12 @@ print('Moving object catalog loaded.')
 def ingestion(transCatalog, log=None):
     if log is not None:
         log.info('Ingesting catalog.')
-    print('Loading NN classifier...')
+        log.info('Loading NN classifier...')
     ml_model_new = os.getenv('ML_MODEL_NEW', files('saguaro_pipeline').joinpath('model_onlyscorr16_ml'))
     model = models.load_model(ml_model_new, compile=False)
     model.compile(optimizer='Adam', metrics=['accuracy'], loss='binary_crossentropy')
-    print('NN classifer loaded.')
+    if log is not None:
+        log.info('NN classifer loaded.')
     imgt0 = time.time()
     with fits.open(transCatalog) as hdul:
         hdul.info()
@@ -208,13 +209,13 @@ def ingestion(transCatalog, log=None):
         image_data = hdul[1].data
     if log is not None:
         log.info('Ingestion: '+str(len(image_data)) + ' candidates found.')
-    print(str(len(image_data)) + ' candidates found.')
     basefile = os.path.basename(transCatalog)
     pngpath_main = f'{os.environ["THUMB_PATH"]}/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
     observation_id, dateobs = newsql.add_observation_record(basefile, hdr)
     resnumber = newsql.pipecandmatch(observation_id)
     tpng, tml, tml_nn, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], [], [], []
-    print(observation_id, len(resnumber), len(image_data))
+    if log is not None:
+        log.info(f'SurveyObservationRecord {observation_id}: {len(resnumber)} previously ingested candidates.')
     if len(resnumber) < len(image_data):  # not fully ingested before
 
         # Moving Object Classification
@@ -228,7 +229,6 @@ def ingestion(transCatalog, log=None):
         for row in image_data:
             rowt0 = time.time()
 
-        #    print(row[0], resnumber)
             if str(row[0]) not in resnumber:
                 if np.mean(row[15]) != 0:
                     data = imgscale(row[15])
@@ -271,7 +271,7 @@ def ingestion(transCatalog, log=None):
                 asize = 64
                 msize = 10
                 mldata = diff_data[int(asize / 2 - msize / 2):int(asize / 2 + msize / 2),
-                              int(asize / 2 - msize / 2):int(asize / 2 + msize / 2)]
+                                   int(asize / 2 - msize / 2):int(asize / 2 + msize / 2)]
                 mldata = ((mldata / np.nanmean(mldata)) * np.log(1 + (np.nanmean(mldata) / np.nanstd(mldata))))
                 try:
                     score = (classifier.predict_proba(mldata.reshape((1, -1))))[0][1]
@@ -286,7 +286,7 @@ def ingestion(transCatalog, log=None):
                     classification = 1
                 else:
                     classification = 0
-#                tmobjmatch.append(time.time() - rowt0)
+                tmobjmatch.append(time.time() - rowt0)
 
                 tml_nn_start = time.time()
                 
