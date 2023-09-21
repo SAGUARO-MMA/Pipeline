@@ -94,23 +94,23 @@ def action(event, date, read_path, write_path, field):
         header['CTYPE1'] = 'RA---TPV'
         header['CTYPE2'] = 'DEC--TPV'
         c = unique_dir + os.path.basename(f)
-        with fits.open(c) as hdr:
-            hdr.verify('fix+ignore')
-            data = hdr[1].data
+        try:
+            with fits.open(c) as hdr:
+                hdr.verify('fix+ignore')
+                data = hdr[1].data
+        except:
+            logger.critical('Error opening file ' + f)
         hdul = fits.HDUList([fits.PrimaryHDU(data, header)])
         hdul.writeto(c.replace('.calb.fz', '.fits'), output_verify='fix+ignore')
-        try:
-            stars = header['WCSMATCH']  # check image type
-            t = header['MJD']
-            if stars > 100:  # only continue if science image
-                combine.append(c.replace('.calb.fz', '.fits'))
-                mjd.append(t)
-                back.append(np.median(data))
-                zp.append(header['MAGZP'])
-            else:
-                bad_images += 1
-        except:
-            logger.critical('Error with file ' + f)
+        stars = header.get('WCSMATCH', 0)  # check image type
+        t = header['MJD']
+        if stars > 100:  # only continue if science image
+            combine.append(c.replace('.calb.fz', '.fits'))
+            mjd.append(t)
+            back.append(np.median(data))
+            zp.append(header['MAGZP'])
+        else:
+            bad_images += 1
         with fits.open(css.bad_pixel_mask()) as bpm_hdr:
             mask_header = bpm_hdr[0].header
             data = bpm_hdr[0].data
