@@ -187,6 +187,7 @@ def imgscale(data):
 print('Loading classifier...')
 with open(os.environ['ML_MODEL_OLD'], 'rb') as f:
     classifier = pickle.load(f)
+classifier.n_jobs = 1
 print('Classifier loaded.')
 print('Loading moving object catalog...')
 catalog = movingobjectcatalog(Time.now().mjd)
@@ -289,7 +290,7 @@ def ingestion(transCatalog, log=None):
                 tmobjmatch.append(time.time() - rowt0)
 
                 tml_nn_start = time.time()
-                
+
                 score_bogus, score_real = model.predict(scorr_data[None])[0]
                 tml_nn.append(time.time() - tml_nn_start)
 
