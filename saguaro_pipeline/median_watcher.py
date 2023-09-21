@@ -127,14 +127,15 @@ def action(event, date, read_path, write_path, field):
     if len(combine) > 1:
         masks = [x.replace('.fits', '_mask.fits') for x in combine]
         swarp_config_file = str(files('zogy').joinpath('Config/swarp_css.config'))
-        subprocess.call(['swarp'] + combine + ['-c', swarp_config_file, '-IMAGE_SIZE',
-                                               '5280,5280', '-IMAGEOUT_NAME', unique_dir + out_file, '-SUBTRACT_BACK',
-                                               'YES', '-GAIN_KEYWORD', 'GAIN', '-BACK_SIZE', '256', '-BACK_FILTERSIZE',
-                                               '3', '-FSCALASTRO_TYPE', 'VARIABLE', '-FSCALE_KEYWORD', 'FLXSCALE'])
-        subprocess.call(['swarp'] + masks + ['-c', swarp_config_file, '-IMAGE_SIZE',
-                                             '5280,5280', '-IMAGEOUT_NAME',
-                                             unique_dir + out_file.replace('.fits', '_mask.fits'), '-SUBTRACT_BACK',
-                                             'NO', '-GAIN_DEFAULT', '1', '-COMBINE_TYPE', 'SUM'])
+        subprocess.call(['swarp'] + combine + ['-c', swarp_config_file, '-IMAGE_SIZE', '5280,5280',
+                                               '-IMAGEOUT_NAME', unique_dir + out_file, '-SUBTRACT_BACK', 'YES',
+                                               '-GAIN_KEYWORD', 'GAIN', '-BACK_SIZE', '256', '-BACK_FILTERSIZE', '3',
+                                               '-FSCALASTRO_TYPE', 'VARIABLE', '-FSCALE_KEYWORD', 'FLXSCALE',
+                                               '-VERBOSE_TYPE', 'LOG'])
+        subprocess.call(['swarp'] + masks + ['-c', swarp_config_file, '-IMAGE_SIZE', '5280,5280',
+                                             '-IMAGEOUT_NAME', unique_dir + out_file.replace('.fits', '_mask.fits'),
+                                             '-SUBTRACT_BACK', 'NO', '-GAIN_DEFAULT', '1', '-COMBINE_TYPE', 'SUM',
+                                             '-VERBOSE_TYPE', 'LOG'])
         with fits.open(unique_dir + out_file, mode='update') as hdr:
             header_swarp = hdr[0].header
             data = hdr[0].data
