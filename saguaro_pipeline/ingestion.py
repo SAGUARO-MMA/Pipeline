@@ -188,11 +188,6 @@ print('Loading classifier...')
 with open(os.environ['ML_MODEL_OLD'], 'rb') as f:
     classifier = pickle.load(f)
 print('Classifier loaded.')
-print('Loading NN classifier...')
-ml_model_new = os.getenv('ML_MODEL_NEW', files('saguaro_pipeline').joinpath('model_onlyscorr16_ml'))
-model = models.load_model(ml_model_new, compile=False)
-model.compile(optimizer='Adam', metrics=['accuracy'], loss='binary_crossentropy')
-print('NN classifer loaded.')
 print('Loading moving object catalog...')
 catalog = movingobjectcatalog(Time.now().mjd)
 print('Moving object catalog loaded.')
@@ -201,6 +196,11 @@ print('Moving object catalog loaded.')
 def ingestion(transCatalog, log=None):
     if log is not None:
         log.info('Ingesting catalog.')
+    print('Loading NN classifier...')
+    ml_model_new = os.getenv('ML_MODEL_NEW', files('saguaro_pipeline').joinpath('model_onlyscorr16_ml'))
+    model = models.load_model(ml_model_new, compile=False)
+    model.compile(optimizer='Adam', metrics=['accuracy'], loss='binary_crossentropy')
+    print('NN classifer loaded.')
     imgt0 = time.time()
     with fits.open(transCatalog) as hdul:
         hdul.info()
