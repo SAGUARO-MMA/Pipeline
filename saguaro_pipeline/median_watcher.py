@@ -224,8 +224,7 @@ def cli():
             print(f'waiting for directory {read_path} to be created...')
             done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
             if done:
-                logger.critical('Scheduled time reached.')
-                logger.critical('No data ingested.')
+                logger.critical('Scheduled time reached. No data ingested.')
                 logger.shutdown()
                 sys.exit()
             else:
@@ -254,37 +253,38 @@ def cli():
         while True:
             done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
             if done:
-                logger.critical('Scheduled time reached.')
                 observer.stop()
                 observer.join()
                 break
             else:
                 time.sleep(1)
 
-    ncombine = np.asarray(ncombine)
-    logger.critical(f'''Median watcher summary:
-    {len(ncombine):d} fields observed,
-    {len(ncombine[ncombine == 4]):d} medians made with 4 images,
-    {len(ncombine[ncombine == 3]):d} medians made with 3 images,
-    {len(ncombine[ncombine == 2]):d} medians made with 2 images,
-    {len(ncombine[ncombine == 1]):d} medians made with 1 image,
-    {len(ncombine[ncombine == 0]):d} medians not made,
-    {bad_images:d} images not used due to bad weather.
-    ''')
-    files_raw = len(glob.glob(read_path + '/G96*_N*.calb.fz')) + len(glob.glob(read_path + '/G96*_S*.calb.fz'))
-    files_head = len(glob.glob(read_path + '/G96*_N*.arch_h')) + len(glob.glob(read_path + '/G96*_S*.arch_h'))
-    logger.critical(f'Received {files_raw:d} calibrated images and {files_head:d} header files.')
+    ncombine = np.array(ncombine)
+    files_raw = glob.glob(read_path + '/G96*_N*.calb.fz') + glob.glob(read_path + '/G96*_S*.calb.fz')
+    files_head = glob.glob(read_path + '/G96*_N*.arch_h') + glob.glob(read_path + '/G96*_S*.arch_h')
     files_trans = glob.glob(css.red_path(date) + '/G96*Scorr.fits.fz')
     candidates = []
     for f in files_trans:
         with fits.open(f) as hdr:
             candidates.append(hdr[1].header['T-NTRANS'])
-    logger.critical(f'Extracted {sum(candidates)} candidates in {len(candidates)} fields.')
-    plt.hist(candidates, bins=np.arange(0, 9000, 100))
-    plt.title('Candidate summary for ' + date)
-    plt.xlabel('Number of candidates per field')
-    hist_file_name = log_file_name + '.pdf'
-    plt.savefig(hist_file_name)
-    logger.slack_client.files_upload(channels='pipeline', file=hist_file_name)
+    logger.critical(f'''Scheduled time reached. Median watcher summary:
+    Received {len(files_raw):d} calibrated images and {len(files_head):d} header files.
+    {len(ncombine):d} fields observed,
+    {np.sum(ncombine == 4):d} medians made with 4 images,
+    {np.sum(ncombine == 3):d} medians made with 3 images,
+    {np.sum(ncombine == 2):d} medians made with 2 images,
+    {np.sum(ncombine == 1):d} medians made with 1 image,
+    {np.sum(ncombine == 0):d} medians not made,
+    {bad_images:d} images not used due to bad weather.
+    Extracted {np.sum(candidates):d} candidates in {len(candidates):d} fields.
+    ''')
+
+    if np.sum(candidates):
+        plt.hist(candidates, bins='auto')
+        plt.title('Candidate summary for ' + date)
+        plt.xlabel('Number of candidates per field')
+        hist_file_name = log_file_name + '.pdf'
+        plt.savefig(hist_file_name)
+        logger.slack_client.files_upload(channels='pipeline', file=hist_file_name)
     logger.shutdown()
     sys.exit()
