@@ -215,7 +215,6 @@ def ingestion(transCatalog, log=None):
     pngpath_main = f'{os.environ["THUMB_PATH"]}/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
     observation_id, dateobs = newsql.add_observation_record(basefile, hdr)
     resnumber = newsql.pipecandmatch(observation_id)
-    tpng, tml, tml_nn, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], [], [], []
     if log is not None:
         log.info(f'SurveyObservationRecord {observation_id}: {len(resnumber)} previously ingested candidates.')
     if len(resnumber) < len(image_data):  # not fully ingested before
@@ -240,7 +239,7 @@ def ingestion(transCatalog, log=None):
         image_data['MLSCORE_REAL'], image_data['MLSCORE_BOGUS'] = model.predict(scorr_data, verbose=2).T
         tml_nn = time.time() - tml_nn_start
 
-        tpng, ttingest, tcingest, tmobjmatch = [], [], [], []
+        tpng, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], []
         for row in image_data:
             rowt0 = time.time()
 
@@ -303,7 +302,9 @@ def ingestion(transCatalog, log=None):
                                         row['MLSCORE'], row['MLSCORE_BOGUS'], row['MLSCORE_REAL'], observation_id, dateobs)
                 tcingest.append(time.time() - rowt0)
 
-    tcomp = time.time() - imgt0
-    if log is not None:
-        log.info('Ingestion: '+basefile+'  Average time to make png, save png, run ml, target ingest,candidateingest,total candidates,'+ str(np.mean(tpng))+','+str(np.mean(tpngsave))+','+str(tml)+','+str(tml_nn)+','+str(np.mean(ttingest))+','+str(np.mean(tcingest))+','+str(len(tpng)))
-        log.info('Ingestion: Time to complete ' + basefile + ': '+str(tcomp)+' '+str(len(image_data) / tcomp)+' cand/sec')
+        tcomp = time.time() - imgt0
+        if log is not None:
+            log.info('Ingestion: '+basefile+'  Average time to make png, save png, run ml, target ingest,candidateingest,total candidates,'+ str(np.mean(tpng))+','+str(np.mean(tpngsave))+','+str(tml)+','+str(tml_nn)+','+str(np.mean(ttingest))+','+str(np.mean(tcingest))+','+str(len(tpng)))
+            log.info('Ingestion: Time to complete ' + basefile + ': '+str(tcomp)+' '+str(len(image_data) / tcomp)+' cand/sec')
+    elif log is not None:
+        log.info('Image already fully ingested. Skipping ingestion.')
