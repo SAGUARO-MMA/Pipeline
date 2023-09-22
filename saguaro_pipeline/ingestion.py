@@ -239,6 +239,12 @@ def ingestion(transCatalog, log=None):
         image_data['MLSCORE_REAL'], image_data['MLSCORE_BOGUS'] = model.predict(scorr_data, verbose=2).T
         tml_nn = time.time() - tml_nn_start
 
+        ra_radians = np.radians(image_data['ALPHAWIN_J2000'])
+        dec_radians = np.radians(image_data['DELTAWIN_J2000'])
+        image_data['CX'] = np.cos(ra_radians) * np.cos(dec_radians)
+        image_data['CY'] = np.sin(ra_radians) * np.cos(dec_radians)
+        image_data['CZ'] = np.sin(dec_radians)
+
         tpng, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], []
         for row in image_data:
             rowt0 = time.time()
@@ -288,18 +294,13 @@ def ingestion(transCatalog, log=None):
                     classification = 0
                 tmobjmatch.append(time.time() - rowt0)
 
-                ra = row['ALPHAWIN_J2000']
-                dec = row['DELTAWIN_J2000']
-                res = newsql.get_or_create_target(ra, dec)
+                res = newsql.get_or_create_target(row['ALPHAWIN_J2000'], row['DELTAWIN_J2000'])
                 ttingest.append(time.time() - rowt0)
 
-                cx = np.cos(np.radians(ra)) * np.cos(np.radians(dec))
-                cy = np.sin(np.radians(ra)) * np.cos(np.radians(dec))
-                cz = np.sin(np.radians(dec))
-
-                newsql.ingestcandidates(row['NUMBER'], row['ELONGATION'], ra, dec, row['FWHM_TRANS'], row['S2N'],
-                                        row['MAG_PSF'], row['MAGERR_PSF'], classification, cx, cy, cz, res['id'][0],
-                                        row['MLSCORE'], row['MLSCORE_BOGUS'], row['MLSCORE_REAL'], observation_id, dateobs)
+                newsql.ingestcandidates(row['NUMBER'], row['ELONGATION'], row['ALPHAWIN_J2000'], row['DELTAWIN_J2000'],
+                                        row['FWHM_TRANS'], row['S2N'], row['MAG_PSF'], row['MAGERR_PSF'],
+                                        classification, row['CX'], row['CY'], row['CZ'], res['id'][0], row['MLSCORE'],
+                                        row['MLSCORE_BOGUS'], row['MLSCORE_REAL'], observation_id, dateobs)
                 tcingest.append(time.time() - rowt0)
 
         tcomp = time.time() - imgt0
