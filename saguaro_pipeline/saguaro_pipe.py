@@ -385,7 +385,7 @@ def main(telescope=None, date=None, cpu=None):
         q.put(logger.info(f'Running pipeline version {__version__}, with setting file version {tel.__version__}.'))
         q.put(logger.info('Pipeline running on ' + str(cpu) + ' CPUs.'))
         if submit_all:  # redo all files for the given date
-            pool = Pool(cpu)
+            pool = Pool(cpu, maxtasksperchild=1)
             files = sorted(glob.glob(read_path + '/' + file_name))  # grab all files
             jobs = []
             for f in files:
@@ -403,7 +403,7 @@ def main(telescope=None, date=None, cpu=None):
             q.put(logger.info(f'Total wall-time spent: {time.time() - t0} s'))
             logger.shutdown()
         else:  # reduce data in real time, don't redo files alread reduced
-            pool = Pool(cpu)  # create pool with given CPUs and queue feeding into action function
+            pool = Pool(cpu, maxtasksperchild=1)  # create pool with given CPUs and queue feeding into action function
             observer = Observer()  # create observer
             observer.schedule(FileWatcher(pool, telescope), read_path, recursive=False)  # setup observer
             files = sorted(glob.glob(read_path + '/' + file_name))  # glob any files already there
