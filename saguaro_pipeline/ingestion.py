@@ -295,13 +295,13 @@ def ingestion(transCatalog, log=None):
         tcomp = time.time() - imgt0
         if log is not None:
             log.info(f'''Ingestion: {basefile}. Average time to
-            match moving objects = {tmobjmatch:.4f},
-            run old ML = {tml:.4f},
-            run new ML = {tml_nn:.4f},
-            make png = {np.mean(tpng):.4f},
-            save png = {np.mean(tpngsave):.4f},
-            ingest target = {np.mean(ttingest):.4f},
-            ingest candidate = {np.mean(tcingest):.4f}.''')
-            log.info(f'Ingestion: Time to complete {basefile} = {tcomp:.1f}, {len(image_data) / tcomp:.1f} cand/sec')
+            match moving objects = {tmobjmatch:.4f} s,
+            run old ML = {tml:.4f} s,
+            run new ML = {tml_nn:.4f} s,
+            make png = {np.mean(tpng):.4f} s,
+            save png = {np.mean(tpngsave):.4f} s,
+            ingest target = {np.mean(ttingest):.4f} s,
+            ingest candidate = {np.mean(tcingest):.4f} s.''')
+            log.info(f'Ingestion: Time to complete {basefile} = {tcomp:.1f} s, {len(image_data) / tcomp:.1f} cand/s')
     elif log is not None:
         log.info('Image already fully ingested. Skipping ingestion.')
