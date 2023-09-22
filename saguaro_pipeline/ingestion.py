@@ -199,15 +199,12 @@ def ingestion(transCatalog, log=None):
     if log is not None:
         log.info('NN classifer loaded.')
     imgt0 = time.time()
-    with fits.open(transCatalog) as hdul:
-        hdul.info()
-        hdr = hdul[1].header
-        image_data = Table(hdul[1].data)
+    image_data = Table.read(transCatalog)
     if log is not None:
         log.info('Ingestion: '+str(len(image_data)) + ' candidates found.')
     basefile = os.path.basename(transCatalog)
     pngpath_main = f'{os.environ["THUMB_PATH"]}/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
-    observation_id, dateobs = newsql.add_observation_record(basefile, hdr)
+    observation_id, dateobs = newsql.add_observation_record(basefile, image_data.meta)
     resnumber = newsql.pipecandmatch(observation_id)
     if log is not None:
         log.info(f'SurveyObservationRecord {observation_id}: {len(resnumber)} previously ingested candidates.')
@@ -221,7 +218,7 @@ def ingestion(transCatalog, log=None):
 
         # Moving Object Classification
         tmobjmatch_start = time.time()
-        image_data['CLASSIFICATION'] = movingobjectfilter(catalog, ra, dec, hdr['MJD'], 25.0).astype(int)
+        image_data['CLASSIFICATION'] = movingobjectfilter(catalog, ra, dec, image_data.meta['MJD'], 25.0).astype(int)
         tmobjmatch = time.time() - tmobjmatch_start
 
         tml_start = time.time()
@@ -237,7 +234,7 @@ def ingestion(transCatalog, log=None):
         image_data['MLSCORE_REAL'], image_data['MLSCORE_BOGUS'] = model.predict(scorr_data, verbose=2).T
         tml_nn = time.time() - tml_nn_start
 
-        pngpath = f"{pngpath_main}/{hdr['OBJECT']}"
+        pngpath = f"{pngpath_main}/{image_data.meta['OBJECT']}"
         os.makedirs(pngpath, exist_ok=True)
 
         tpng, ttingest, tcingest, tpngsave = [], [], [], []
