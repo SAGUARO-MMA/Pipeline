@@ -1,5 +1,6 @@
 import os
 from astropy.time import Time
+from astropy.table import Table
 import pickle
 import time
 
@@ -207,7 +208,7 @@ def ingestion(transCatalog, log=None):
     with fits.open(transCatalog) as hdul:
         hdul.info()
         hdr = hdul[1].header
-        image_data = hdul[1].data
+        image_data = Table(hdul[1].data)
     if log is not None:
         log.info('Ingestion: '+str(len(image_data)) + ' candidates found.')
     basefile = os.path.basename(transCatalog)
@@ -226,7 +227,20 @@ def ingestion(transCatalog, log=None):
         pngpath = f"{pngpath_main}/{hdr['OBJECT']}"
         os.makedirs(pngpath, exist_ok=True)
 
-        tpng, tml, ttingest, tcingest, tmobjmatch = [], [], [], [], []
+        tml_start = time.time()
+        mldata = image_data['THUMBNAIL_D'][:, 27:37, 27:37]
+        mldata_mean = np.nanmean(mldata, axis=(1, 2))[:, np.newaxis, np.newaxis]
+        mldata_std = np.nanmean(mldata, axis=(1, 2))[:, np.newaxis, np.newaxis]
+        mldata = mldata / mldata_mean * np.log(1. + mldata_mean / mldata_std)
+        image_data['MLSCORE'] = classifier.predict_proba(mldata.reshape(-1, 100))[:, 0]
+        tml = time.time() - tml_start
+
+        tml_nn_start = time.time()
+        scorr_data = image_data['THUMBNAIL_SCORR'][:, 24:40, 24:40]
+        image_data['MLSCORE_REAL'], image_data['MLSCORE_BOGUS'] = model.predict(scorr_data, verbose=2).T
+        tml_nn = time.time() - tml_nn_start
+
+        tpng, ttingest, tcingest, tmobjmatch = [], [], [], []
         for row in image_data:
             rowt0 = time.time()
 
@@ -245,7 +259,6 @@ def ingestion(transCatalog, log=None):
                 ref = Image.fromarray(data)
                 ref = ref.convert('L')
 
-                diff_data = row[17]
                 if np.mean(row[17]) != 0:
                     data = imgscale(row[17])
                 else:
@@ -253,7 +266,6 @@ def ingestion(transCatalog, log=None):
                 diff = Image.fromarray(data)
                 diff = diff.convert('L')
 
-                scorr_data = row[18][24:40,24:40]
                 if np.mean(row[18]) != 0:
                     data = imgscale(row[18])
                 else:
@@ -269,18 +281,6 @@ def ingestion(transCatalog, log=None):
                 scorr.save(f"{pngpath}/{row['NUMBER']}_{visit}_scorr.png")
                 tpngsave.append(time.time() - rowt0)
 
-                asize = 64
-                msize = 10
-                mldata = diff_data[int(asize / 2 - msize / 2):int(asize / 2 + msize / 2),
-                                   int(asize / 2 - msize / 2):int(asize / 2 + msize / 2)]
-                mldata = ((mldata / np.nanmean(mldata)) * np.log(1 + (np.nanmean(mldata) / np.nanstd(mldata))))
-                try:
-                    score = (classifier.predict_proba(mldata.reshape((1, -1))))[0][1]
-                except:
-                    score = 0
-
-                tml.append(time.time() - rowt0)
-
                 # Moving Object Classification
                 mvobj = movingobjectfilter(filtered_catalog, float(row[7]), float(row[8]), float(hdr['MJD']), 25.0)
                 if mvobj:
@@ -288,11 +288,6 @@ def ingestion(transCatalog, log=None):
                 else:
                     classification = 0
                 tmobjmatch.append(time.time() - rowt0)
-
-                tml_nn_start = time.time()
-
-                score_bogus, score_real = model.predict(scorr_data[None])[0]
-                tml_nn.append(time.time() - tml_nn_start)
 
                 ra = row['ALPHAWIN_J2000']
                 dec = row['DELTAWIN_J2000']
@@ -305,10 +300,10 @@ def ingestion(transCatalog, log=None):
 
                 newsql.ingestcandidates(row['NUMBER'], row['ELONGATION'], ra, dec, row['FWHM_TRANS'], row['S2N'],
                                         row['MAG_PSF'], row['MAGERR_PSF'], classification, cx, cy, cz, res['id'][0],
-                                        score, score_bogus, score_real, observation_id, dateobs)
+                                        row['MLSCORE'], row['MLSCORE_BOGUS'], row['MLSCORE_REAL'], observation_id, dateobs)
                 tcingest.append(time.time() - rowt0)
 
     tcomp = time.time() - imgt0
     if log is not None:
-        log.info('Ingestion: '+basefile+'  Average time to make png, save png, run ml, target ingest,candidateingest,total candidates,'+ str(np.mean(tpng))+','+str(np.mean(tpngsave))+','+str(np.mean(tml))+','+str(np.mean(tml_nn))+','+str(np.mean(ttingest))+','+str(np.mean(tcingest))+','+str(len(tpng)))
+        log.info('Ingestion: '+basefile+'  Average time to make png, save png, run ml, target ingest,candidateingest,total candidates,'+ str(np.mean(tpng))+','+str(np.mean(tpngsave))+','+str(tml)+','+str(tml_nn)+','+str(np.mean(ttingest))+','+str(np.mean(tcingest))+','+str(len(tpng)))
         log.info('Ingestion: Time to complete ' + basefile + ': '+str(tcomp)+' '+str(len(image_data) / tcomp)+' cand/sec')
