@@ -101,7 +101,7 @@ def movingobjectfilter(s_catalog, s_ra, s_dec, obsmjd, filter_radius):
         decs.append(body.a_dec)
     catalog_coords = SkyCoord(ras, decs, unit='deg')
     s_coords = SkyCoord(s_ra, s_dec)
-    _, separation, _ = catalog_coords.match_to_catalog_sky(s_coords)
+    _, separation, _ = s_coords.match_to_catalog_sky(catalog_coords)
     return separation.arcsec < filter_radius
 
 
