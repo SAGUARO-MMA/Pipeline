@@ -7,12 +7,14 @@ import time
 import ephem  # PyEphem module
 from PIL import Image
 from astropy.coordinates.sky_coordinate import SkyCoord
-from astropy.io import fits
+import astropy.units as u
 import numpy as np
 
 from . import newsql
 from importlib_resources import files
 from tensorflow.keras import models
+
+u.def_unit('e-')  # avoid warning when reading electrons with Astropy table
 
 
 def convert_mpcorb_to_monthly_catalog(filename_in, filename_out):
