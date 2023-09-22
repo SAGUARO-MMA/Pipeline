@@ -86,29 +86,23 @@ def movingobjectcatalog(obsmjd):
         convert_mpcorb_to_monthly_catalog('MPCORB.DAT', fnam)
     with open(fnam) as f_catalog:
         for line in f_catalog:
-            catalog_list.append(line.rstrip())
+            catalog_list.append(ephem.readdb(line))
     return catalog_list
 
 
 def movingobjectfilter(s_catalog, s_ra, s_dec, obsmjd, filter_radius):
-    DEG2RAD = 0.01745329252
-    s_ra_radians, s_dec_radians = s_ra * DEG2RAD, s_dec * DEG2RAD
+    """Searches for matches between (ra, dec, time) and the Minor Planet Center catalog. Takes about a minute to run."""
     tobs = Time(obsmjd, format='mjd')
-
-    s_full_date = tobs.strftime("%Y/%m/%d %H:%M:%S")
-    s_date = ephem.date(s_full_date)
-    s_filtered_bodies = []
-
+    s_date = ephem.date(tobs.datetime)
+    ras, decs = [], []
     for body in s_catalog:
-        test_obj = ephem.readdb(body)
-        test_obj.compute(s_date)
-        test_obj_ra = test_obj.a_ra
-        test_obj_dec = test_obj.a_dec
-        test_obj_separation = 206264.806 * float(ephem.separation((test_obj_ra, test_obj_dec),
-                                                                  (s_ra_radians, s_dec_radians)))
-        if test_obj_separation < filter_radius:
-            s_filtered_bodies.append(body)
-    return s_filtered_bodies
+        body.compute(s_date)
+        ras.append(body.a_ra)
+        decs.append(body.a_dec)
+    catalog_coords = SkyCoord(ras, decs, unit='deg')
+    s_coords = SkyCoord(s_ra, s_dec)
+    _, separation, _ = catalog_coords.match_to_catalog_sky(s_coords)
+    return separation.arcsec < filter_radius
 
 
 def radectodecimal(ra, dec):
@@ -219,12 +213,16 @@ def ingestion(transCatalog, log=None):
         log.info(f'SurveyObservationRecord {observation_id}: {len(resnumber)} previously ingested candidates.')
     if len(resnumber) < len(image_data):  # not fully ingested before
 
-        # Moving Object Classification
-        ra, dec = radectodecimal(hdr['RA'], hdr['DEC'])
-        filtered_catalog=movingobjectfilter(catalog,ra,dec, float(hdr['MJD']), 2.5*3600.)
+        ra = image_data['ALPHAWIN_J2000'].quantity
+        dec = image_data['DELTAWIN_J2000'].quantity
+        image_data['CX'] = np.cos(ra) * np.cos(dec)
+        image_data['CY'] = np.sin(ra) * np.cos(dec)
+        image_data['CZ'] = np.sin(dec)
 
-        pngpath = f"{pngpath_main}/{hdr['OBJECT']}"
-        os.makedirs(pngpath, exist_ok=True)
+        # Moving Object Classification
+        tmobjmatch_start = time.time()
+        image_data['CLASSIFICATION'] = movingobjectfilter(catalog, ra, dec, hdr['MJD'], 25.0).astype(int)
+        tmobjmatch = time.time() - tmobjmatch_start
 
         tml_start = time.time()
         mldata = image_data['THUMBNAIL_D'][:, 27:37, 27:37]
@@ -239,17 +237,14 @@ def ingestion(transCatalog, log=None):
         image_data['MLSCORE_REAL'], image_data['MLSCORE_BOGUS'] = model.predict(scorr_data, verbose=2).T
         tml_nn = time.time() - tml_nn_start
 
-        ra_radians = np.radians(image_data['ALPHAWIN_J2000'])
-        dec_radians = np.radians(image_data['DELTAWIN_J2000'])
-        image_data['CX'] = np.cos(ra_radians) * np.cos(dec_radians)
-        image_data['CY'] = np.sin(ra_radians) * np.cos(dec_radians)
-        image_data['CZ'] = np.sin(dec_radians)
+        pngpath = f"{pngpath_main}/{hdr['OBJECT']}"
+        os.makedirs(pngpath, exist_ok=True)
 
-        tpng, ttingest, tcingest, tmobjmatch, tpngsave = [], [], [], [], []
+        tpng, ttingest, tcingest, tpngsave = [], [], [], []
         for row in image_data:
-            rowt0 = time.time()
-
             if str(row[0]) not in resnumber:
+                tpng_start = time.time()
+
                 if np.mean(row[15]) != 0:
                     data = imgscale(row[15])
                 else:
@@ -277,35 +272,37 @@ def ingestion(transCatalog, log=None):
                     data = row[18]
                 scorr = Image.fromarray(data)
                 scorr = scorr.convert('L')
-                tpng.append((time.time() - rowt0))
+                tpng.append((time.time() - tpng_start))
 
+                tpngsave_start = time.time()
                 visit = basefile.split('_')[4]
                 img.save(f"{pngpath}/{row['NUMBER']}_{visit}_img.png")
                 ref.save(f"{pngpath}/{row['NUMBER']}_{visit}_ref.png")
                 diff.save(f"{pngpath}/{row['NUMBER']}_{visit}_diff.png")
                 scorr.save(f"{pngpath}/{row['NUMBER']}_{visit}_scorr.png")
-                tpngsave.append(time.time() - rowt0)
+                tpngsave.append(time.time() - tpngsave_start)
 
-                # Moving Object Classification
-                mvobj = movingobjectfilter(filtered_catalog, float(row[7]), float(row[8]), float(hdr['MJD']), 25.0)
-                if mvobj:
-                    classification = 1
-                else:
-                    classification = 0
-                tmobjmatch.append(time.time() - rowt0)
-
+                ttingest_start = time.time()
                 res = newsql.get_or_create_target(row['ALPHAWIN_J2000'], row['DELTAWIN_J2000'])
-                ttingest.append(time.time() - rowt0)
+                ttingest.append(time.time() - ttingest_start)
 
+                tcingest_start = time.time()
                 newsql.ingestcandidates(row['NUMBER'], row['ELONGATION'], row['ALPHAWIN_J2000'], row['DELTAWIN_J2000'],
                                         row['FWHM_TRANS'], row['S2N'], row['MAG_PSF'], row['MAGERR_PSF'],
-                                        classification, row['CX'], row['CY'], row['CZ'], res['id'][0], row['MLSCORE'],
-                                        row['MLSCORE_BOGUS'], row['MLSCORE_REAL'], observation_id, dateobs)
-                tcingest.append(time.time() - rowt0)
+                                        row['CLASSIFICATION'], row['CX'], row['CY'], row['CZ'], res['id'][0],
+                                        row['MLSCORE'], row['MLSCORE_BOGUS'], row['MLSCORE_REAL'], observation_id, dateobs)
+                tcingest.append(time.time() - tcingest_start)
 
         tcomp = time.time() - imgt0
         if log is not None:
-            log.info('Ingestion: '+basefile+'  Average time to make png, save png, run ml, target ingest,candidateingest,total candidates,'+ str(np.mean(tpng))+','+str(np.mean(tpngsave))+','+str(tml)+','+str(tml_nn)+','+str(np.mean(ttingest))+','+str(np.mean(tcingest))+','+str(len(tpng)))
-            log.info('Ingestion: Time to complete ' + basefile + ': '+str(tcomp)+' '+str(len(image_data) / tcomp)+' cand/sec')
+            log.info(f'''Ingestion: {basefile}. Average time to
+            match moving objects = {tmobjmatch:.4f},
+            run old ML = {tml:.4f},
+            run new ML = {tml_nn:.4f},
+            make png = {np.mean(tpng):.4f},
+            save png = {np.mean(tpngsave):.4f},
+            ingest target = {np.mean(ttingest):.4f},
+            ingest candidate = {np.mean(tcingest):.4f}.''')
+            log.info(f'Ingestion: Time to complete {basefile} = {tcomp:.1f}, {len(image_data) / tcomp:.1f} cand/sec')
     elif log is not None:
         log.info('Image already fully ingested. Skipping ingestion.')
