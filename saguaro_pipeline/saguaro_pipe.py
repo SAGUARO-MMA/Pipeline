@@ -418,14 +418,13 @@ def main(telescope=None, date=None, cpu=None):
                 if done:  # if scheduled exit time has been reached, exit pipeline
                     while pool._cache != {}:
                         time.sleep(1)
-                    q.put(logger.critical(''))
                     input_images = glob.glob(read_path + "/" + file_name)
                     output_files = glob.glob(red_path + '/*_trans.fits*')
                     candidates = np.array([fits.getval(f, 'T-NTRANS', ext=1) for f in output_files])
                     q.put(logger.critical(f'Scheduled time reached. Pipeline summary:\n'
-                                          f'{len(input_images):d} input images found.\n'
-                                          f'{len(output_files):d} successfully processed.\n'
-                                          f'{candidates.sum():d} candidates extracted.'))
+                                          f'    {len(input_images):d} input images found.\n'
+                                          f'    {len(output_files):d} successfully processed.\n'
+                                          f'    {candidates.sum():d} candidates extracted.'))
                     if np.sum(candidates):
                         plt.hist(candidates, bins='auto')
                         plt.title('Candidate summary for ' + date)
