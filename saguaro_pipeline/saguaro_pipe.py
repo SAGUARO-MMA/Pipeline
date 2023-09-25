@@ -420,7 +420,7 @@ def main(telescope=None, date=None, cpu=None):
                         time.sleep(1)
                     input_images = glob.glob(read_path + "/" + file_name)
                     output_files = glob.glob(red_path + '/*_trans.fits*')
-                    candidates = np.array([fits.getval(f, 'T-NTRANS', ext=1) for f in output_files])
+                    candidates = np.array([fits.getval(f, 'T-NTRANS', ext=1) for f in output_files], dtype=int)
                     q.put(logger.critical(f'Scheduled time reached. Pipeline summary:\n'
                                           f'    {len(input_images):d} input images found.\n'
                                           f'    {len(output_files):d} successfully processed.\n'
