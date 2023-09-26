@@ -6,15 +6,12 @@ import time
 
 import ephem  # PyEphem module
 from PIL import Image
-from astropy.coordinates.sky_coordinate import SkyCoord
-import astropy.units as u
+from astropy.coordinates import SkyCoord
 import numpy as np
 
 from . import newsql
 from importlib_resources import files
 from tensorflow.keras import models
-
-u.def_unit('e-')  # avoid warning when reading electrons with Astropy table
 
 
 def convert_mpcorb_to_monthly_catalog(filename_in, filename_out):
@@ -107,15 +104,6 @@ def movingobjectfilter(s_catalog, s_ra, s_dec, obsmjd, filter_radius):
     return separation.arcsec < filter_radius
 
 
-def radectodecimal(ra, dec):
-    c = SkyCoord(ra, dec, unit='deg')
-    c = c.to_string('decimal')
-    both = str.split(str(c))
-    rad = float(both[0]) * 15.
-    decd = float(both[1])
-    return rad, decd
-
-
 def getsky(data):
     """
     Determine the sky parameters for a FITS data extension.
@@ -200,108 +188,99 @@ def ingestion(transCatalog, log=None):
     model.compile(optimizer='Adam', metrics=['accuracy'], loss='binary_crossentropy')
     if log is not None:
         log.info('NN classifer loaded.')
+
     imgt0 = time.time()
-    image_data = Table.read(transCatalog)
+    image_data = Table.read(transCatalog, unit_parse_strict='silent')
     if log is not None:
         log.info('Ingestion: '+str(len(image_data)) + ' candidates found.')
     basefile = os.path.basename(transCatalog)
-    pngpath_main = f'{os.environ["THUMB_PATH"]}/{basefile[4:8]}/{basefile[8:10]}/{basefile[10:12]}'
-    observation_id, dateobs = newsql.add_observation_record(basefile, image_data.meta)
-    resnumber = newsql.pipecandmatch(observation_id)
-    if log is not None:
-        log.info(f'SurveyObservationRecord {observation_id}: {len(resnumber)} previously ingested candidates.')
-    if len(resnumber) < len(image_data):  # not fully ingested before
+    observation_id, dateobs = newsql.add_observation_record(basefile, image_data.meta, log=log)
 
-        ra = image_data['ALPHAWIN_J2000'].quantity
-        dec = image_data['DELTAWIN_J2000'].quantity
-        image_data['CX'] = np.cos(ra) * np.cos(dec)
-        image_data['CY'] = np.sin(ra) * np.cos(dec)
-        image_data['CZ'] = np.sin(dec)
+    ra = image_data['ALPHAWIN_J2000'].quantity
+    dec = image_data['DELTAWIN_J2000'].quantity
+    image_data['CX'] = np.cos(ra) * np.cos(dec)
+    image_data['CY'] = np.sin(ra) * np.cos(dec)
+    image_data['CZ'] = np.sin(dec)
 
-        # Moving Object Classification
-        tmobjmatch_start = time.time()
-        image_data['CLASSIFICATION'] = movingobjectfilter(catalog, ra, dec, image_data.meta['MJD'], 25.0).astype(int)
-        tmobjmatch = time.time() - tmobjmatch_start
+    # Moving Object Classification
+    tmobjmatch_start = time.time()
+    image_data['CLASSIFICATION'] = movingobjectfilter(catalog, ra, dec, image_data.meta['MJD'], 25.0).astype(int)
+    tmobjmatch = time.time() - tmobjmatch_start
 
-        tml_start = time.time()
-        mldata = image_data['THUMBNAIL_D'][:, 27:37, 27:37]
-        mldata_mean = np.nanmean(mldata, axis=(1, 2))[:, np.newaxis, np.newaxis]
-        mldata_std = np.nanmean(mldata, axis=(1, 2))[:, np.newaxis, np.newaxis]
-        mldata = mldata / mldata_mean * np.log(1. + mldata_mean / mldata_std)
-        image_data['MLSCORE'] = classifier.predict_proba(mldata.reshape(-1, 100))[:, 0]
-        tml = time.time() - tml_start
+    tml_start = time.time()
+    mldata = image_data['THUMBNAIL_D'][:, 27:37, 27:37]
+    mldata_mean = np.nanmean(mldata, axis=(1, 2))[:, np.newaxis, np.newaxis]
+    mldata_std = np.nanmean(mldata, axis=(1, 2))[:, np.newaxis, np.newaxis]
+    mldata = mldata / mldata_mean * np.log(1. + mldata_mean / mldata_std)
+    image_data['MLSCORE'] = classifier.predict_proba(mldata.reshape(-1, 100))[:, 0]
+    tml = time.time() - tml_start
 
-        tml_nn_start = time.time()
-        scorr_data = image_data['THUMBNAIL_SCORR'][:, 24:40, 24:40]
-        image_data['MLSCORE_REAL'], image_data['MLSCORE_BOGUS'] = model.predict(scorr_data, verbose=2).T
-        tml_nn = time.time() - tml_nn_start
+    tml_nn_start = time.time()
+    scorr_data = image_data['THUMBNAIL_SCORR'][:, 24:40, 24:40]
+    image_data['MLSCORE_REAL'], image_data['MLSCORE_BOGUS'] = model.predict(scorr_data, verbose=2).T
+    tml_nn = time.time() - tml_nn_start
 
-        pngpath = f"{pngpath_main}/{image_data.meta['OBJECT']}"
-        os.makedirs(pngpath, exist_ok=True)
+    ttingest_start = time.time()
+    image_data['TARGETID'] = newsql.get_or_create_targets(image_data['ALPHAWIN_J2000'], image_data['DELTAWIN_J2000'])
+    ttingest = time.time() - ttingest_start
 
-        tpng, ttingest, tcingest, tpngsave = [], [], [], []
-        for row in image_data:
-            if str(row[0]) not in resnumber:
-                tpng_start = time.time()
+    tcingest_start = time.time()
+    newsql.ingestcandidates(image_data, observation_id, dateobs)
+    tcingest = time.time() - tcingest_start
 
-                if np.mean(row[15]) != 0:
-                    data = imgscale(row[15])
-                else:
-                    data = row[15]
-                img = Image.fromarray(data)
-                img = img.convert('L')
+    pngpath = os.path.join(os.environ['THUMB_PATH'], basefile[4:8], basefile[8:10], basefile[10:12],
+                           image_data.meta['OBJECT'])
+    os.makedirs(pngpath, exist_ok=True)
 
-                if np.mean(row[16]) != 0:
-                    data = imgscale(row[16])
-                else:
-                    data = row[16]
-                ref = Image.fromarray(data)
-                ref = ref.convert('L')
+    tpng, tpngsave = [], []
+    for row in image_data:
+        tpng_start = time.time()
 
-                if np.mean(row[17]) != 0:
-                    data = imgscale(row[17])
-                else:
-                    data = row[17]
-                diff = Image.fromarray(data)
-                diff = diff.convert('L')
+        if np.mean(row[15]) != 0:
+            data = imgscale(row[15])
+        else:
+            data = row[15]
+        img = Image.fromarray(data)
+        img = img.convert('L')
 
-                if np.mean(row[18]) != 0:
-                    data = imgscale(row[18])
-                else:
-                    data = row[18]
-                scorr = Image.fromarray(data)
-                scorr = scorr.convert('L')
-                tpng.append((time.time() - tpng_start))
+        if np.mean(row[16]) != 0:
+            data = imgscale(row[16])
+        else:
+            data = row[16]
+        ref = Image.fromarray(data)
+        ref = ref.convert('L')
 
-                tpngsave_start = time.time()
-                visit = basefile.split('_')[4]
-                img.save(f"{pngpath}/{row['NUMBER']}_{visit}_img.png")
-                ref.save(f"{pngpath}/{row['NUMBER']}_{visit}_ref.png")
-                diff.save(f"{pngpath}/{row['NUMBER']}_{visit}_diff.png")
-                scorr.save(f"{pngpath}/{row['NUMBER']}_{visit}_scorr.png")
-                tpngsave.append(time.time() - tpngsave_start)
+        if np.mean(row[17]) != 0:
+            data = imgscale(row[17])
+        else:
+            data = row[17]
+        diff = Image.fromarray(data)
+        diff = diff.convert('L')
 
-                ttingest_start = time.time()
-                res = newsql.get_or_create_target(row['ALPHAWIN_J2000'], row['DELTAWIN_J2000'])
-                ttingest.append(time.time() - ttingest_start)
+        if np.mean(row[18]) != 0:
+            data = imgscale(row[18])
+        else:
+            data = row[18]
+        scorr = Image.fromarray(data)
+        scorr = scorr.convert('L')
+        tpng.append((time.time() - tpng_start))
 
-                tcingest_start = time.time()
-                newsql.ingestcandidates(row['NUMBER'], row['ELONGATION'], row['ALPHAWIN_J2000'], row['DELTAWIN_J2000'],
-                                        row['FWHM_TRANS'], row['S2N'], row['MAG_PSF'], row['MAGERR_PSF'],
-                                        row['CLASSIFICATION'], row['CX'], row['CY'], row['CZ'], res['id'][0],
-                                        row['MLSCORE'], row['MLSCORE_BOGUS'], row['MLSCORE_REAL'], observation_id, dateobs)
-                tcingest.append(time.time() - tcingest_start)
+        tpngsave_start = time.time()
+        visit = basefile.split('_')[4]
+        img.save(f"{pngpath}/{row['NUMBER']}_{visit}_img.png")
+        ref.save(f"{pngpath}/{row['NUMBER']}_{visit}_ref.png")
+        diff.save(f"{pngpath}/{row['NUMBER']}_{visit}_diff.png")
+        scorr.save(f"{pngpath}/{row['NUMBER']}_{visit}_scorr.png")
+        tpngsave.append(time.time() - tpngsave_start)
 
         tcomp = time.time() - imgt0
         if log is not None:
-            log.info(f'''Ingestion: {basefile}. Average time to
+            log.info(f'''Ingestion: {basefile}. Total time to
             match moving objects = {tmobjmatch:.4f} s,
             run old ML = {tml:.4f} s,
             run new ML = {tml_nn:.4f} s,
-            make png = {np.mean(tpng):.4f} s,
-            save png = {np.mean(tpngsave):.4f} s,
-            ingest target = {np.mean(ttingest):.4f} s,
-            ingest candidate = {np.mean(tcingest):.4f} s.''')
+            make png = {np.sum(tpng):.4f} s,
+            save png = {np.sum(tpngsave):.4f} s,
+            ingest targets = {ttingest:.4f} s,
+            ingest candidates = {tcingest:.4f} s.''')
             log.info(f'Ingestion: Time to complete {basefile} = {tcomp:.1f} s, {len(image_data) / tcomp:.1f} cand/s')
-    elif log is not None:
-        log.info('Image already fully ingested. Skipping ingestion.')
