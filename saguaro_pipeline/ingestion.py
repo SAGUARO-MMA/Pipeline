@@ -272,14 +272,14 @@ def ingestion(transCatalog, log=None):
         scorr.save(f"{pngpath}/{row['NUMBER']}_{visit}_scorr.png")
         tpngsave.append(time.time() - tpngsave_start)
 
-        tcomp = time.time() - imgt0
-        if log is not None:
-            log.info(f'''Ingestion: {basefile}. Total time to
-            match moving objects = {tmobjmatch:.4f} s,
-            run old ML = {tml:.4f} s,
-            run new ML = {tml_nn:.4f} s,
-            make png = {np.sum(tpng):.4f} s,
-            save png = {np.sum(tpngsave):.4f} s,
-            ingest targets = {ttingest:.4f} s,
-            ingest candidates = {tcingest:.4f} s.''')
-            log.info(f'Ingestion: Time to complete {basefile} = {tcomp:.1f} s, {len(image_data) / tcomp:.1f} cand/s')
+    tcomp = time.time() - imgt0
+    if log is not None:
+        log.info(f'''Ingestion: {basefile}. Total time to
+        match moving objects = {tmobjmatch:.4f} s,
+        run old ML = {tml:.4f} s,
+        run new ML = {tml_nn:.4f} s,
+        make png = {np.sum(tpng):.4f} s,
+        save png = {np.sum(tpngsave):.4f} s,
+        ingest targets = {ttingest:.4f} s,
+        ingest candidates = {tcingest:.4f} s.''')
+        log.info(f'Ingestion: Time to complete {basefile} = {tcomp:.1f} s, {len(image_data) / tcomp:.1f} cand/s')
