@@ -397,9 +397,6 @@ def main(telescope=None, date=None, cpu=None):
                     job.get()
                 except IOError as e:
                     q.put(logger.error('Job failed due to: ' + str(e)))
-            q.put(logger.info('Processed all data taken on the night of ' + date + '.'))
-            final_number = len(glob.glob(red_path + '*_trans.fits*'))
-            q.put(logger.info(f'Summary: {len(files):d} files found, {final_number:d} successfully processed.'))
             q.put(logger.info(f'Total wall-time spent: {time.time() - t0} s'))
             logger.shutdown()
         else:  # reduce data in real time, don't redo files alread reduced
@@ -418,20 +415,6 @@ def main(telescope=None, date=None, cpu=None):
                 if done:  # if scheduled exit time has been reached, exit pipeline
                     while pool._cache != {}:
                         time.sleep(1)
-                    input_images = glob.glob(read_path + "/" + file_name)
-                    output_files = glob.glob(red_path + '/*_trans.fits*')
-                    candidates = np.array([fits.getval(f, 'T-NTRANS', ext=1) for f in output_files], dtype=int)
-                    q.put(logger.critical(f'Scheduled time reached. Pipeline summary:\n'
-                                          f'    {len(input_images):d} input images found.\n'
-                                          f'    {len(output_files):d} successfully processed.\n'
-                                          f'    {candidates.sum():d} candidates extracted.'))
-                    if np.sum(candidates):
-                        plt.hist(candidates, bins='auto')
-                        plt.title('Candidate summary for ' + date)
-                        plt.xlabel('Number of candidates per field')
-                        hist_file_name = log_file_name + '.pdf'
-                        plt.savefig(hist_file_name)
-                        logger.slack_client.files_upload(channels='pipeline', file=hist_file_name)
 
                     observer.stop()  # stop observer
                     observer.join()  # join observer
@@ -441,6 +424,22 @@ def main(telescope=None, date=None, cpu=None):
                     sys.exit()
                 else:  # if scheduled exit time has not reached, continue
                     time.sleep(1)
+
+        # final summary stats and plot
+        input_images = glob.glob(read_path + "/" + file_name)
+        output_files = glob.glob(red_path + '/*_trans.fits*')
+        candidates = np.array([fits.getval(f, 'T-NTRANS', ext=1) for f in output_files], dtype=int)
+        q.put(logger.critical(f'Processed all data taken on the night of {date}:\n'
+                              f'    {len(input_images):d} input images found.\n'
+                              f'    {len(output_files):d} successfully processed.\n'
+                              f'    {candidates.sum():d} candidates extracted.'))
+        if np.sum(candidates):
+            plt.hist(candidates, bins='auto')
+            plt.title('Candidate summary for ' + date)
+            plt.xlabel('Number of candidates per field')
+            hist_file_name = log_file_name + '.pdf'
+            plt.savefig(hist_file_name)
+            logger.slack_client.files_upload(channels='pipeline', file=hist_file_name)
 
     except OSError as e:  # if OS error occurs, exit pipeline
         q.put(logger.critical('OS related error occurred during reduction: ' + str(e)))
