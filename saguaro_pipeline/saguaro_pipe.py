@@ -398,7 +398,6 @@ def main(telescope=None, date=None, cpu=None):
                 except IOError as e:
                     q.put(logger.error('Job failed due to: ' + str(e)))
             q.put(logger.info(f'Total wall-time spent: {time.time() - t0} s'))
-            logger.shutdown()
         else:  # reduce data in real time, don't redo files alread reduced
             pool = Pool(cpu, maxtasksperchild=1)  # create pool with given CPUs and queue feeding into action function
             observer = Observer()  # create observer
@@ -420,8 +419,6 @@ def main(telescope=None, date=None, cpu=None):
                     observer.join()  # join observer
                     pool.close()  # close pool
                     pool.join()  # join pool
-                    logger.shutdown()
-                    sys.exit()
                 else:  # if scheduled exit time has not reached, continue
                     time.sleep(1)
 
@@ -440,6 +437,9 @@ def main(telescope=None, date=None, cpu=None):
             hist_file_name = log_file_name + '.pdf'
             plt.savefig(hist_file_name)
             logger.slack_client.files_upload(channels='pipeline', file=hist_file_name)
+
+        logger.shutdown()
+        sys.exit()
 
     except OSError as e:  # if OS error occurs, exit pipeline
         q.put(logger.critical('OS related error occurred during reduction: ' + str(e)))
