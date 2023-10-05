@@ -265,7 +265,7 @@ def action(item_list):
             q.put(logger.info('ZOGY comment: '+comment))
     except BaseException as e:
         q.put(logger.critical('Uncaught error occurred in ZOGY: '+reduced+' - ' + str(e)))
-        q.put(logger.error(''.join(traceback.format_exception(e))))
+        q.put(logger.error(''.join(traceback.format_exception(type(e), e, e.__traceback__))))
     transient_catalog = reduced.replace('.fits', '_trans.fits')
     q.put(logger.info(unique_dir + '/' + transient_catalog))
     if os.path.exists(unique_dir + '/' + transient_catalog):
