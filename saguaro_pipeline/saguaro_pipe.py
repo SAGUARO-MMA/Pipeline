@@ -419,6 +419,8 @@ def main(telescope=None, date=None, cpu=None):
                     observer.join()  # join observer
                     pool.close()  # close pool
                     pool.join()  # join pool
+                    break
+
                 else:  # if scheduled exit time has not reached, continue
                     time.sleep(1)
 
