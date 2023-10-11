@@ -245,7 +245,7 @@ def science_process(science_file, unique_dir, log_file_name):
     with fits.open(science_file) as hdr:
         Red = hdr[0].data
         header = hdr[0].header
-    comment = 'No reduction needed. Creating mask.\n '
+    comment = 'No reduction needed. Creating mask. '
     with fits.open(mask_file) as hdr:
         mask_bp = hdr[0].data
     Red, header, comment = saguaro_pipe.mask_create(science_file, 'css', unique_dir, Red, mask_bp, header, comment,

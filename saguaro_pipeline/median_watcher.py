@@ -6,7 +6,7 @@ Script to create median images from the 4 CSS images per field.
 
 __version__ = "2.0.0"  # last updated 2023-07-06
 
-import sys
+import argparse
 import numpy as np
 import os
 import datetime
@@ -24,9 +24,6 @@ import fnmatch as fn
 from . import css, saguaro_logging, saguaro_pipe
 import shutil
 from importlib_resources import files
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()
@@ -89,54 +86,53 @@ def action(event, date, read_path, write_path, field):
     os.makedirs(unique_dir)
     for i, f in enumerate(images):
         subprocess.call(['cp', f, unique_dir])
-        try:
-            header = fits.open(f.replace('calb.fz', 'arch_h'))[0].header
-            c = unique_dir + os.path.basename(f)
-            con = True
-        except:
+        header_filename = f.replace('calb.fz', 'arch_h')
+        if not os.path.exists(header_filename):
             logger.error('No header available for ' + f)
-            con = False
-        if con:
+            continue
+        header = fits.open(header_filename)[0].header
+        header['CTYPE1'] = 'RA---TPV'
+        header['CTYPE2'] = 'DEC--TPV'
+        c = unique_dir + os.path.basename(f)
+        try:
             with fits.open(c) as hdr:
                 hdr.verify('fix+ignore')
-                header['CTYPE1'] = 'RA---TPV'
-                header['CTYPE2'] = 'DEC--TPV'
                 data = hdr[1].data
-                hdul = fits.HDUList([fits.PrimaryHDU(data, header)])
-                hdul.writeto(c.replace('.calb.fz', '.fits'), output_verify='fix+ignore')
-                try:
-                    stars = header['WCSMATCH']  # check image type
-                    t = header['MJD']
-                    if stars > 100:  # only continue if science image
-                        combine.append(c.replace('.calb.fz', '.fits'))
-                        mjd.append(t)
-                        back.append(np.median(data))
-                        zp.append(header['MAGZP'])
-                    else:
-                        bad_images += 1
-                except:
-                    logger.critical('Error with file ' + f)
-                with fits.open(css.bad_pixel_mask()) as bpm_hdr:
-                    mask_header = bpm_hdr[0].header
-                    data = bpm_hdr[0].data
-                    fits.writeto(c.replace('.calb.fz', '_mask.fits'), data, mask_header + header,
-                                 output_verify='fix+ignore')
-                with open(unique_dir + out_file.replace('.fits', '.head'), 'w') as swarp_head:
-                    for card in header.cards:
-                        swarp_head.write(str(card) + '\n')
-                shutil.copy(unique_dir + out_file.replace('.fits', '.head'),
-                            unique_dir + out_file.replace('.fits', '_mask.head'))
+        except:
+            logger.critical('Error opening file ' + f)
+        hdul = fits.HDUList([fits.PrimaryHDU(data, header)])
+        hdul.writeto(c.replace('.calb.fz', '.fits'), output_verify='fix+ignore')
+        stars = header.get('WCSMATCH', 0)  # check image type
+        t = header['MJD']
+        if stars > 100:  # only continue if science image
+            combine.append(c.replace('.calb.fz', '.fits'))
+            mjd.append(t)
+            back.append(np.median(data))
+            zp.append(header['MAGZP'])
+        else:
+            bad_images += 1
+        with fits.open(css.bad_pixel_mask()) as bpm_hdr:
+            mask_header = bpm_hdr[0].header
+            data = bpm_hdr[0].data
+        fits.writeto(c.replace('.calb.fz', '_mask.fits'), data, mask_header + header,
+                     output_verify='fix+ignore')
+        with open(unique_dir + out_file.replace('.fits', '.head'), 'w') as swarp_head:
+            for card in header.cards:
+                swarp_head.write(str(card) + '\n')
+        shutil.copy(unique_dir + out_file.replace('.fits', '.head'),
+                    unique_dir + out_file.replace('.fits', '_mask.head'))
     if len(combine) > 1:
         masks = [x.replace('.fits', '_mask.fits') for x in combine]
         swarp_config_file = str(files('zogy').joinpath('Config/swarp_css.config'))
-        subprocess.call(['swarp'] + combine + ['-c', swarp_config_file, '-IMAGE_SIZE',
-                                               '5280,5280', '-IMAGEOUT_NAME', unique_dir + out_file, '-SUBTRACT_BACK',
-                                               'YES', '-GAIN_KEYWORD', 'GAIN', '-BACK_SIZE', '256', '-BACK_FILTERSIZE',
-                                               '3', '-FSCALASTRO_TYPE', 'VARIABLE', '-FSCALE_KEYWORD', 'FLXSCALE'])
-        subprocess.call(['swarp'] + masks + ['-c', swarp_config_file, '-IMAGE_SIZE',
-                                             '5280,5280', '-IMAGEOUT_NAME',
-                                             unique_dir + out_file.replace('.fits', '_mask.fits'), '-SUBTRACT_BACK',
-                                             'NO', '-GAIN_DEFAULT', '1', '-COMBINE_TYPE', 'SUM'])
+        subprocess.call(['swarp'] + combine + ['-c', swarp_config_file, '-IMAGE_SIZE', '5280,5280',
+                                               '-IMAGEOUT_NAME', unique_dir + out_file, '-SUBTRACT_BACK', 'YES',
+                                               '-GAIN_KEYWORD', 'GAIN', '-BACK_SIZE', '256', '-BACK_FILTERSIZE', '3',
+                                               '-FSCALASTRO_TYPE', 'VARIABLE', '-FSCALE_KEYWORD', 'FLXSCALE',
+                                               '-VERBOSE_TYPE', 'LOG'])
+        subprocess.call(['swarp'] + masks + ['-c', swarp_config_file, '-IMAGE_SIZE', '5280,5280',
+                                             '-IMAGEOUT_NAME', unique_dir + out_file.replace('.fits', '_mask.fits'),
+                                             '-SUBTRACT_BACK', 'NO', '-GAIN_DEFAULT', '1', '-COMBINE_TYPE', 'SUM',
+                                             '-VERBOSE_TYPE', 'LOG'])
         with fits.open(unique_dir + out_file, mode='update') as hdr:
             header_swarp = hdr[0].header
             data = hdr[0].data
@@ -203,15 +199,16 @@ class FileWatcher(FileSystemEventHandler, object):
 def cli():
     global field_list, ncombine, logger, bad_images, missing_head
 
-    try:
-        mode = sys.argv[1]
-    except:
-        mode = False
+    params = argparse.ArgumentParser(description='User parameters.')
+    params.add_argument('--date', default=None, help='Date of files to process.')  # optional date argument
+    args = params.parse_args()
 
-    try:
-        date = sys.argv[2]
-    except:
+    if args.date:
+        date = args.date
+        submit_all = True
+    else:
         date = datetime.datetime.utcnow().strftime('%Y/%m/%d')
+        submit_all = False
 
     log_file_name = f'{css.log_path()}/median_watcher_' + datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
     logger = saguaro_logging.initialize_logger(log_file_name)
@@ -225,10 +222,9 @@ def cli():
             print(f'waiting for directory {read_path} to be created...')
             done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
             if done:
-                logger.critical('Scheduled time reached.')
-                logger.critical('No data ingested.')
+                logger.critical('Scheduled time reached. No data ingested.')
                 logger.shutdown()
-                sys.exit()
+                return
             else:
                 time.sleep(1)
         else:
@@ -242,7 +238,7 @@ def cli():
     bad_images = 0
     missing_head = 0
 
-    if mode:  # to rerun all data
+    if submit_all:  # to rerun all data
         images = glob.glob(read_path + '/G96*.calb.fz')
         for f in images:
             field = check_field(f)
@@ -255,36 +251,23 @@ def cli():
         while True:
             done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
             if done:
-                logger.critical('Scheduled time reached.')
                 observer.stop()
                 observer.join()
                 break
             else:
                 time.sleep(1)
 
-    ncombine = np.asarray(ncombine)
-    logger.critical(f'''Median watcher summary:
+    ncombine = np.array(ncombine)
+    files_raw = glob.glob(read_path + '/G96*_[NS]*.calb.fz')
+    files_head = glob.glob(read_path + '/G96*_[NS]*.arch_h')
+    logger.critical(f'''Scheduled time reached. Median watcher summary:
+    Received {len(files_raw):d} calibrated images and {len(files_head):d} header files.
     {len(ncombine):d} fields observed,
-    {len(ncombine[ncombine == 4]):d} medians made with 4 images,
-    {len(ncombine[ncombine == 3]):d} medians made with 3 images,
-    {len(ncombine[ncombine == 2]):d} medians made with 2 images,
-    {len(ncombine[ncombine == 1]):d} medians made with 1 image,
-    {len(ncombine[ncombine == 0]):d} medians not made,
+    {np.sum(ncombine == 4):d} medians made with 4 images,
+    {np.sum(ncombine == 3):d} medians made with 3 images,
+    {np.sum(ncombine == 2):d} medians made with 2 images,
+    {np.sum(ncombine == 1):d} medians made with 1 image,
+    {np.sum(ncombine == 0):d} medians not made,
     {bad_images:d} images not used due to bad weather.
     ''')
-    files_raw = len(glob.glob(read_path + '/G96*_N*.calb.fz')) + len(glob.glob(read_path + '/G96*_S*.calb.fz'))
-    files_head = len(glob.glob(read_path + '/G96*_N*.arch_h')) + len(glob.glob(read_path + '/G96*_S*.arch_h'))
-    logger.critical(f'Received {files_raw:d} calibrated images and {files_head:d} header files.')
-    files_trans = glob.glob(css.red_path(date) + '/G96*Scorr.fits.fz')
-    candidates = []
-    for f in files_trans:
-        with fits.open(f) as hdr:
-            candidates.append(hdr[1].header['T-NTRANS'])
-    plt.hist(candidates, bins=np.arange(0, 9000, 100))
-    plt.title('Candidate summary for ' + date)
-    plt.xlabel('Number of candidates per field')
-    hist_file_name = log_file_name + '.pdf'
-    plt.savefig(hist_file_name)
-    logger.slack_client.files_upload(channels='pipeline', file=hist_file_name)
     logger.shutdown()
-    sys.exit()

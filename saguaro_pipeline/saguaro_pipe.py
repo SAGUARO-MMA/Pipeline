@@ -4,7 +4,7 @@
 Pipeline for real-time data reduction and image subtraction.
 """
 
-__version__ = "2.0.1"  # last updated 2023-09-07
+__version__ = "2.1.0"  # last updated 2023-09-26
 
 import argparse
 import datetime
@@ -30,6 +30,9 @@ from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
 from zogy import zogy
 from . import ingestion, saguaro_logging
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 warnings.simplefilter('ignore', category=AstropyWarning)
 gc.enable()
@@ -262,7 +265,7 @@ def action(item_list):
             q.put(logger.info('ZOGY comment: '+comment))
     except BaseException as e:
         q.put(logger.critical('Uncaught error occurred in ZOGY: '+reduced+' - ' + str(e)))
-        q.put(logger.critical(''.join(traceback.format_tb(e.__traceback__))))
+        q.put(logger.error(''.join(traceback.format_exception(type(e), e, e.__traceback__))))
     transient_catalog = reduced.replace('.fits', '_trans.fits')
     q.put(logger.info(unique_dir + '/' + transient_catalog))
     if os.path.exists(unique_dir + '/' + transient_catalog):
@@ -382,7 +385,7 @@ def main(telescope=None, date=None, cpu=None):
         q.put(logger.info(f'Running pipeline version {__version__}, with setting file version {tel.__version__}.'))
         q.put(logger.info('Pipeline running on ' + str(cpu) + ' CPUs.'))
         if submit_all:  # redo all files for the given date
-            pool = Pool(cpu)
+            pool = Pool(cpu, maxtasksperchild=1)
             files = sorted(glob.glob(read_path + '/' + file_name))  # grab all files
             jobs = []
             for f in files:
@@ -394,13 +397,9 @@ def main(telescope=None, date=None, cpu=None):
                     job.get()
                 except IOError as e:
                     q.put(logger.error('Job failed due to: ' + str(e)))
-            q.put(logger.info('Processed all data taken on the night of ' + date + '.'))
-            final_number = len(glob.glob(red_path + '*_trans.fits*'))
-            q.put(logger.info(f'Summary: {len(files):d} files found, {final_number:d} successfully processed.'))
             q.put(logger.info(f'Total wall-time spent: {time.time() - t0} s'))
-            logger.shutdown()
         else:  # reduce data in real time, don't redo files alread reduced
-            pool = Pool(cpu)  # create pool with given CPUs and queue feeding into action function
+            pool = Pool(cpu, maxtasksperchild=1)  # create pool with given CPUs and queue feeding into action function
             observer = Observer()  # create observer
             observer.schedule(FileWatcher(pool, telescope), read_path, recursive=False)  # setup observer
             files = sorted(glob.glob(read_path + '/' + file_name))  # glob any files already there
@@ -415,19 +414,34 @@ def main(telescope=None, date=None, cpu=None):
                 if done:  # if scheduled exit time has been reached, exit pipeline
                     while pool._cache != {}:
                         time.sleep(1)
-                    q.put(logger.critical('Scheduled time reached, exiting pipeline.'))
-                    final_number = len(glob.glob(red_path + '/*_trans.fits*'))
-                    q.put(logger.critical(f'Summary: '
-                                          f'{len(glob.glob(read_path + "/" + file_name)):d} input images found, '
-                                          f'{final_number:d} successfully processed.'))
+
                     observer.stop()  # stop observer
                     observer.join()  # join observer
                     pool.close()  # close pool
                     pool.join()  # join pool
-                    logger.shutdown()
-                    sys.exit()
+                    break
+
                 else:  # if scheduled exit time has not reached, continue
                     time.sleep(1)
+
+        # final summary stats and plot
+        input_images = glob.glob(read_path + "/" + file_name)
+        output_files = glob.glob(red_path + '/*_trans.fits*')
+        candidates = np.array([fits.getval(f, 'T-NTRANS', ext=1) for f in output_files], dtype=int)
+        q.put(logger.critical(f'Processed all data taken on the night of {date}:\n'
+                              f'    {len(input_images):d} input images found.\n'
+                              f'    {len(output_files):d} successfully processed.\n'
+                              f'    {candidates.sum():d} candidates extracted.'))
+        if np.sum(candidates):
+            plt.hist(candidates, bins='auto')
+            plt.title('Candidate summary for ' + date)
+            plt.xlabel('Number of candidates per field')
+            hist_file_name = log_file_name + '.pdf'
+            plt.savefig(hist_file_name)
+            logger.slack_client.files_upload(channels='pipeline', file=hist_file_name)
+
+        logger.shutdown()
+        sys.exit()
 
     except OSError as e:  # if OS error occurs, exit pipeline
         q.put(logger.critical('OS related error occurred during reduction: ' + str(e)))
