@@ -38,7 +38,7 @@ class MyLogger(object):
         self._log.critical(text)
         try:
             self.slack_client.chat_postMessage(channel='pipeline', text=text)
-        except SlackApiError:  # if connection error occurs, add to log
+        except:  # if connection error occurs, add to log
             self._log.error('Connection error: failed to connect to slack. Above meassage not uploaded.')
 
     @staticmethod
