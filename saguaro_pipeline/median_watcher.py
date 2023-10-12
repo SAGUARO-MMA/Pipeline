@@ -79,7 +79,6 @@ def action(event, date, read_path, write_path, field):
     combine = []
     mjd = []
     back = []
-    zp = []
     global bad_images
     out_file = os.path.basename(images[0]).split('_00')[0] + '_med.fits'
     unique_dir = f'{css.work_path(date)}/{uuid.uuid1().hex}/'
@@ -108,7 +107,6 @@ def action(event, date, read_path, write_path, field):
             combine.append(c.replace('.calb.fz', '.fits'))
             mjd.append(t)
             back.append(np.median(data))
-            zp.append(header['MAGZP'])
         else:
             bad_images += 1
         with fits.open(css.bad_pixel_mask()) as bpm_hdr:
