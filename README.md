@@ -92,5 +92,23 @@ In order to run the pipeline automatically, we use the following cronjobs:
 
 Then, because we don't want to fill up the disk, we do a weekly backup of the data products to a network drive (as root). We do this at noon so that the pipeline is not running at the same time:
 ```
-0 12 * * 0 cd /dataraid6/sassy/data/css/; rsync -avz inc log raw red /mnt/dsand/saguaro/data/css > /home/sassy/saguaro_cleanup.log 2>&1; rm -rv inc/* log/* raw/* red/* tmp/*
+0 12 * * 0 cd bash /root/bin/css.sh >> /root/bin/css.log 2>&1
 ```
+
+The content of css.sh is subject to local configurations but, at it's simplest, we use:
+```
+echo "CSS start: " `date`
+
+cd /dataraid6/sassy/data/css 
+rsync -arv --remove-source-files --progress -e "ssh -i /root/.ssh/id_rsa" inc log raw red pndaly@10.130.133.220:/mnt/tank/dsand/saguaro/data/css
+if [ $? != 0 ]; then
+  echo "ERROR: failed to rsync /mnt/dsand/saguaro/data/css"
+  exit -3
+else
+  rm -rv tmp/*
+fi
+
+echo "CSS end:   " `date`
+```
+
+
