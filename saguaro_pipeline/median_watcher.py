@@ -4,7 +4,7 @@
 Script to create median images from the 4 CSS images per field.
 """
 
-__version__ = "2.0.0"  # last updated 2023-07-06
+__version__ = "2.1.2"  # last updated 2023-11-01
 
 import argparse
 import numpy as np
