@@ -29,7 +29,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
 from zogy import zogy
-from . import ingestion, saguaro_logging
+from . import ingestion, saguaro_logging, util
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -88,48 +88,25 @@ def fpack_file(file):
     return file.replace('.fits', '.fits.fz')
 
 
-def funpack_file(file):
-    """
-    Funpack file and return new name.
-    """
-    subprocess.call(['funpack', '-D', file])
-    return file.replace('.fz', '')
-
-
-def scheduled_exit(date, telescope):
-    """
-    Checks current time against the scheduled exit time for the night pipeline.
-    If the current time has past the scheduled exit time and before the
-    scheduled start time, return True. Otherwise return False.
-    """
-    tel = importlib.import_module(f'{__package__}.{telescope}')
-    if (date + datetime.timedelta(hours=tel.time_zone())).hour == 8:
-        # if current is after scheduled exit but before next run, exit
-        return True
-    else:
-        return False
-
-
-def mask_create(science_file, telescope, unique_dir, Red, mask_bp, header, comment, saturation, log_file_name):
+def mask_create(science_file, tel, unique_dir, Red, mask_bp, header, comment, log_file_name):
     """
     Creates a mask file for an image.
     """
-    tel = importlib.import_module(f'{__package__}.{telescope}')
     mask_infnan = ~np.isfinite(Red)
     mask_bp[mask_infnan & (mask_bp != 32)] = 1
     Red[mask_infnan] = 0
     Red = tel.mask_edge_pixels(Red, mask_bp)
     mask_sat = np.zeros((np.shape(Red)[0], np.shape(Red)[1])).astype(np.bool)  # create empty mask
-    astroscrappy.update_mask(Red, mask_sat, saturation, True)  # add saturated stars to mask
+    astroscrappy.update_mask(Red, mask_sat, tel.saturation(), True)  # add saturated stars to mask
     mask_sat = mask_sat.astype(np.uint8)  # set saturated star mask type
-    mask_sat[Red >= saturation] = 4  # set saturated pixel flag
+    mask_sat[Red >= tel.saturation()] = 4  # set saturated pixel flag
     mask_sat[mask_sat == 1] = 8  # set connected to saturated pixel flag
     header['COSMIC-P'] = (tel.cosmic(), 'Corrected for cosmic rays?')
     if tel.cosmic() == 'T':
         # clean science image of cosmic rays and create cosmic ray mask
         mask_cr, clean = astroscrappy.detect_cosmics(Red, inmask=(masks[i] + mask_sat).astype(np.bool),
                                                      sigclip=tel.sat_sigclip(), readnoise=tel.sat_readnoise(header),
-                                                     gain=tel.sat_gain(header), satlevel=saturation,
+                                                     gain=tel.sat_gain(header), satlevel=tel.saturation(),
                                                      objlim=tel.sat_objlim())
         mask_cr = mask_cr.astype(np.uint8)  # set cosmic ray mask type
         mask_cr[mask_cr == 1] = 2  # set cosmic ray flag
@@ -185,7 +162,7 @@ def mask_create(science_file, telescope, unique_dir, Red, mask_bp, header, comme
     mask_hdu.header['M-CR'] = (tel.mask_cr(), 'Cosmic ray pixels included in mask?')
     mask_hdu.header['M-CRVAL'] = (2, 'Value of masked cosmic ray pixels.')
     mask_hdu.header['M-CRNUM'] = (np.sum(mask & 2 == 2), 'Number of cosmic ray pixels.')
-    mask_hdu.header['SATURATE'] = (saturation, 'Level of saturation.')
+    mask_hdu.header['SATURATE'] = (tel.saturation(), 'Level of saturation.')
     mask_hdu.header['M-SP'] = (tel.mask_sp(), 'Saturated pixels included in mask?')
     mask_hdu.header['M-SPVAL'] = (4, 'Value of masked saturated pixels.')
     mask_hdu.header['M-SPNUM'] = (np.sum(mask & 4 == 4), 'Number of saturated pixels.')
@@ -202,20 +179,22 @@ def mask_create(science_file, telescope, unique_dir, Red, mask_bp, header, comme
     return Red, header, comment
 
 
-def copying(file):
+def science_process(science_file, unique_dir, log_file_name):
     """
-    Function that waits until the given file size is no longer changing before returning.
-    This ensures the file has finished copying before the file is accessed.
+    Function to process science images. As CSS data has already been processed, so only a mask is created.
     """
-    copying_file = True  # file is copying
-    size_earlier = -1  # set inital size of file
-    while copying_file:
-        size_now = os.path.getsize(file)  # get current size of file
-        if size_now == size_earlier:  # if the size of the file has not changed, return
-            return
-        else:  # if the size of the file has changed
-            size_earlier = os.path.getsize(file)  # get new size of file
-            time.sleep(1)  # wait
+    subprocess.call(['cp', science_file, science_file.replace('.fits', '_mask.fits'), '.'])
+    science_file = util.funpack_file(os.path.basename(science_file))
+    mask_file = util.funpack_file(os.path.basename(science_file).replace('.fits', '_mask.fits'))
+    with fits.open(science_file) as hdr:
+        Red = hdr[0].data
+        header = hdr[0].header
+    comment = 'No reduction needed. Creating mask. '
+    with fits.open(mask_file) as hdr:
+        mask_bp = hdr[0].data
+    Red, header, comment = mask_create(science_file, tel, unique_dir, Red, mask_bp, header, comment, log_file_name)
+    fits.writeto(science_file, Red, header, overwrite=True)
+    return science_file, comment
 
 
 def action(item_list):
@@ -238,7 +217,7 @@ def action(item_list):
         file = event
         q.put(logger.info('Found old file ' + file))
     if fn.fnmatch(os.path.basename(file), file_name):  # only continue if the file matches the expected file name
-        copying(file)  # check to see if write is finished writing
+        util.copying(file)  # check to see if write is finished writing
     else:
         return
     unique_dir = work_path + '/' + uuid.uuid1().hex  # create a unique tmp directoty to work in
@@ -355,8 +334,7 @@ def main(telescope=None, date=None, cpu=None):
                 os.makedirs(read_path)
                 read_dir = True
             except OSError:
-                done = tel.scheduled_exit(datetime.datetime.utcnow(),
-                                          telescope)  # check if scheduled exit time has been reached
+                done = util.scheduled_exit(datetime.datetime.fromtimestamp(t0), tel)  # check if time to exit
                 if done:
                     sys.exit()
                 else:
@@ -410,7 +388,7 @@ def main(telescope=None, date=None, cpu=None):
                     pool.apply_async(action, [[f, telescope]])  # add waiting files to pool
             observer.start()  # start observer
             while True:  # continue to monitor
-                done = scheduled_exit(datetime.datetime.utcnow(), telescope)  # check if exit time has been reached
+                done = util.scheduled_exit(datetime.datetime.fromtimestamp(t0), tel)  # check if time to exit
                 if done:  # if scheduled exit time has been reached, exit pipeline
                     while pool._cache != {}:
                         time.sleep(1)

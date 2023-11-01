@@ -16,7 +16,7 @@ import warnings
 from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
 
-from . import saguaro_pipe
+from . import util
 from importlib_resources import files
 
 warnings.simplefilter('ignore', category=AstropyWarning)
@@ -235,23 +235,11 @@ def tel_delta():
     return 7
 
 
-def science_process(science_file, unique_dir, log_file_name):
+def stop_hour():
     """
-    Function to process science images. As CSS data has already been processed, so only a mask is created.
+    Returns the UTC hour at which the pipeline will stop for this telescope.
     """
-    subprocess.call(['cp', science_file, science_file.replace('.fits', '_mask.fits'), '.'])
-    science_file = saguaro_pipe.funpack_file(os.path.basename(science_file))
-    mask_file = saguaro_pipe.funpack_file(os.path.basename(science_file).replace('.fits', '_mask.fits'))
-    with fits.open(science_file) as hdr:
-        Red = hdr[0].data
-        header = hdr[0].header
-    comment = 'No reduction needed. Creating mask. '
-    with fits.open(mask_file) as hdr:
-        mask_bp = hdr[0].data
-    Red, header, comment = saguaro_pipe.mask_create(science_file, 'css', unique_dir, Red, mask_bp, header, comment,
-                                                    saturation(), log_file_name)
-    fits.writeto(science_file, Red, header, overwrite=True)
-    return science_file, comment
+    return 15
 
 
 def output(f, date):
@@ -272,7 +260,7 @@ def find_ref(reduced):
     for f in ref_files:
         subprocess.call(['cp', f, '.'])
         if '.fz' in f:
-            saguaro_pipe.funpack_file(os.path.basename(f))
+            util.funpack_file(os.path.basename(f))
     ref_file = field + '_wcs.fits'
     if os.path.exists(ref_file):
         return ref_file
