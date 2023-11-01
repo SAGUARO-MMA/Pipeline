@@ -1,6 +1,6 @@
 # SAGUARO Pipeline
 
-The SAUARO pipeline is designed to run every night, automatically started by a cron job, to reduce incoming data.
+The SAGUARO pipeline is designed to run every night, automatically started by a cron job, to reduce incoming data.
 
 The main pipeline script is `saguaro-pipe`, and runs together with the telescope setting file (e.g. `css.py` for the 1.5 m CSS telescope on Mt. Lemmon) to reduce new data through a watchdog observer (the location of the folder with new data is defined in the setting file). The pipeline will reduce the data according to the options defined in the setting file as well as creating a mask for each image.
 
