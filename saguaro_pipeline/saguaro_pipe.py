@@ -4,7 +4,7 @@
 Pipeline for real-time data reduction and image subtraction.
 """
 
-__version__ = "2.1.2"  # last updated 2023-11-01
+__version__ = "2.1.3"  # last updated 2023-11-02
 
 import argparse
 import datetime
@@ -224,7 +224,7 @@ def action(item_list):
     os.mkdir(unique_dir)
     os.chdir(unique_dir)
     q.put(logger.info('Starting reduction for '+file))
-    reduced, comment = tel.science_process(file, unique_dir, log_file_name)  # submit image for reduction
+    reduced, comment = science_process(file, unique_dir, log_file_name)  # submit image for reduction
     q.put(logger.info('Ending reduction for '+file+' '+comment))
     ref = tel.find_ref(reduced)  # find reference image
     try:
