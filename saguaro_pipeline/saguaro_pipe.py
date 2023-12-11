@@ -390,12 +390,12 @@ def main(telescope=None, date=None, cpu=None):
             while True:  # continue to monitor
                 done = util.scheduled_exit(datetime.datetime.fromtimestamp(t0), tel)  # check if time to exit
                 if done:  # if scheduled exit time has been reached, exit pipeline
-                    while pool._cache != {}:
-                        time.sleep(1)
+                    if pool._cache:
+                        q.put(logger.critical(f'Terminating idle processes: {pool._cache}'))
 
                     observer.stop()  # stop observer
                     observer.join()  # join observer
-                    pool.close()  # close pool
+                    pool.terminate()  # terminate worker processes and close pool
                     pool.join()  # join pool
                     break
 
