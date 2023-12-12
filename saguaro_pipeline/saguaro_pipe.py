@@ -389,7 +389,9 @@ def main(telescope=None, date=None, cpu=None):
             observer.start()  # start observer
             while True:  # continue to monitor
                 done = util.scheduled_exit(datetime.datetime.fromtimestamp(t0), tel)  # check if time to exit
+                q.put(logger.info(f'Current time: ' + datetime.datetime.now.strftime("%Y-%m-%dT%H:%M:%S")))
                 if done:  # if scheduled exit time has been reached, exit pipeline
+                    q.put(logger.info('Exiting now'))
                     if pool._cache:
                         q.put(logger.critical(f'Terminating idle processes: {pool._cache}'))
 
@@ -400,7 +402,8 @@ def main(telescope=None, date=None, cpu=None):
                     break
 
                 else:  # if scheduled exit time has not reached, continue
-                    time.sleep(1)
+                    q.put(logger.info('Continuing to monitor'))
+                    time.sleep(60)
 
         # final summary stats and plot
         input_images = glob.glob(read_path + "/" + file_name)
