@@ -389,7 +389,7 @@ def main(telescope=None, date=None, cpu=None):
             observer.start()  # start observer
             while True:  # continue to monitor
                 done = util.scheduled_exit(datetime.datetime.fromtimestamp(t0), tel)  # check if time to exit
-                q.put(logger.info(f'Current time: ' + datetime.datetime.now.strftime("%Y-%m-%dT%H:%M:%S")))
+                q.put(logger.info(f'Current time: ' + datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")))
                 if done:  # if scheduled exit time has been reached, exit pipeline
                     q.put(logger.info('Exiting now'))
                     if pool._cache:
