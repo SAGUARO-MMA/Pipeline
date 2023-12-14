@@ -265,4 +265,4 @@ def find_ref(reduced):
     if os.path.exists(ref_file):
         return ref_file
     else:
-        return None
+        return ''
