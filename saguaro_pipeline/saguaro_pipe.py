@@ -4,7 +4,7 @@
 Pipeline for real-time data reduction and image subtraction.
 """
 
-__version__ = "2.1.5"  # last updated 2024-04-23
+__version__ = "2.1.6"  # last updated 2024-04-23
 
 import argparse
 import datetime
@@ -389,18 +389,21 @@ def main(telescope=None, date=None, cpu=None):
             observer.start()  # start observer
             while True:  # continue to monitor
                 done = util.scheduled_exit(datetime.datetime.fromtimestamp(t0), tel)  # check if time to exit
+                q.put(logger.info(f'Current time: ' + datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")))
                 if done:  # if scheduled exit time has been reached, exit pipeline
-                    while pool._cache != {}:
-                        time.sleep(1)
+                    q.put(logger.info('Exiting now'))
+                    if pool._cache:
+                        q.put(logger.critical(f'Terminating idle processes: {pool._cache}'))
 
                     observer.stop()  # stop observer
                     observer.join()  # join observer
-                    pool.close()  # close pool
+                    pool.terminate()  # terminate worker processes and close pool
                     pool.join()  # join pool
                     break
 
                 else:  # if scheduled exit time has not reached, continue
-                    time.sleep(1)
+                    q.put(logger.info('Continuing to monitor'))
+                    time.sleep(60)
 
         # final summary stats and plot
         input_images = glob.glob(read_path + "/" + file_name)
