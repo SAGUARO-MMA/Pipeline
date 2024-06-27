@@ -99,6 +99,7 @@ The content of css.sh is subject to local configurations but, at it's simplest, 
 ```
 echo "CSS start: " `date`
 
+# FITS cleanup
 cd /dataraid6/sassy/data/css 
 rsync -arv --remove-source-files --progress -e "ssh -i /root/.ssh/id_rsa" inc log raw red pndaly@10.130.133.220:/mnt/tank/dsand/saguaro/data/css
 if [ $? != 0 ]; then
@@ -106,6 +107,21 @@ if [ $? != 0 ]; then
   exit -3
 else
   rm -rv tmp/*
+fi
+
+# new thumbnail cleanup
+cd /dataraid6/sassy/data
+rsync -arv --remove-source-files -e "ssh -i /root/.ssh/id_rsa" png pndaly@10.130.133.220:/mnt/tank/dsand/saguaro/data
+if [ $? != 0 ]; then
+  echo "ERROR: failed to rsync /mnt/dsand/saguaro/data/png"
+  exit -3
+fi
+
+# old thumbnail compression (to save inodes)
+cd /mnt/dsand/saguaro/data/png/$(date -d "-13 months" +%Y)
+LAST_MONTH=`date -d "-13 months" +%m`
+if [ ! -e $LAST_MONTH.tar.gz ]; then
+  tar --remove-files -acvf $LAST_MONTH.tar.gz $LAST_MONTH
 fi
 
 echo "CSS end:   " `date`
