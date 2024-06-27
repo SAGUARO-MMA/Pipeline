@@ -114,7 +114,8 @@ def add_observation_record(basefile, hdr, log=None):
                            f"AND scheduled_start > '{prev_midnight_utc.iso}' "
                            f"AND scheduled_start < '{next_midnight_utc.iso}'")
     if res and res['status'][0] == 'PENDING':  # requested observation
-        parameters = res['parameters'][0].update(parameters)
+        res['parameters'][0].update(parameters)
+        parameters = res['parameters'][0]
         db.query(f"UPDATE tom_surveys_surveyobservationrecord "
                  f"SET parameters='{json.dumps(parameters)}', observation_id='{basefile}', status='COMPLETED', "
                  f"scheduled_start='{dateobs.iso}', modified=NOW() "

@@ -216,7 +216,7 @@ def ingestion(transCatalog, log=None):
 
     tml_nn_start = time.time()
     scorr_data = image_data['THUMBNAIL_SCORR'][:, 24:40, 24:40]
-    image_data['MLSCORE_REAL'], image_data['MLSCORE_BOGUS'] = model.predict(scorr_data, verbose=2).T
+    image_data['MLSCORE_BOGUS'], image_data['MLSCORE_REAL'] = model.predict(scorr_data, verbose=2).T
     tml_nn = time.time() - tml_nn_start
 
     ttingest_start = time.time()

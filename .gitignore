@@ -5,3 +5,4 @@ rf_model.ml
 build/
 *.egg-info/
 _version.py
+.DS_Store

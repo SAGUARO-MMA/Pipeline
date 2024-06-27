@@ -4,7 +4,7 @@
 Script to create median images from the 4 CSS images per field.
 """
 
-__version__ = "2.0.0"  # last updated 2023-07-06
+__version__ = "2.1.7"  # last updated 2024-04-23
 
 import argparse
 import numpy as np
@@ -21,7 +21,7 @@ import uuid
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import fnmatch as fn
-from . import css, saguaro_logging, saguaro_pipe
+from . import css, saguaro_logging, util
 import shutil
 from importlib_resources import files
 
@@ -39,7 +39,7 @@ def check_field(event):
         except AttributeError:
             file = str(event.src_path)  # get name of new file
         if fn.fnmatch(os.path.basename(file), 'G96_*.calb.fz'):  # only continue if event is a fits file
-            saguaro_pipe.copying(file)  # check to see if write is finished writing
+            util.copying(file)  # check to see if write is finished writing
     except AttributeError:  # if event is a file
         file = event
     field = file.split('_2B_')[1].split('_00')[0]
@@ -79,7 +79,6 @@ def action(event, date, read_path, write_path, field):
     combine = []
     mjd = []
     back = []
-    zp = []
     global bad_images
     out_file = os.path.basename(images[0]).split('_00')[0] + '_med.fits'
     unique_dir = f'{css.work_path(date)}/{uuid.uuid1().hex}/'
@@ -108,7 +107,6 @@ def action(event, date, read_path, write_path, field):
             combine.append(c.replace('.calb.fz', '.fits'))
             mjd.append(t)
             back.append(np.median(data))
-            zp.append(header['MAGZP'])
         else:
             bad_images += 1
         with fits.open(css.bad_pixel_mask()) as bpm_hdr:
@@ -199,6 +197,8 @@ class FileWatcher(FileSystemEventHandler, object):
 def cli():
     global field_list, ncombine, logger, bad_images, missing_head
 
+    t0 = datetime.datetime.utcnow()
+
     params = argparse.ArgumentParser(description='User parameters.')
     params.add_argument('--date', default=None, help='Date of files to process.')  # optional date argument
     args = params.parse_args()
@@ -220,7 +220,7 @@ def cli():
     while read_dir is False:
         if not os.path.exists(read_path):
             print(f'waiting for directory {read_path} to be created...')
-            done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
+            done = util.scheduled_exit(t0, css)
             if done:
                 logger.critical('Scheduled time reached. No data ingested.')
                 logger.shutdown()
@@ -249,7 +249,7 @@ def cli():
         observer.schedule(FileWatcher(date, read_path, write_path), read_path, recursive=False)
         observer.start()
         while True:
-            done = saguaro_pipe.scheduled_exit(datetime.datetime.utcnow(), 'css')
+            done = util.scheduled_exit(t0, css)
             if done:
                 observer.stop()
                 observer.join()
