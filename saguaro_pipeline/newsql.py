@@ -38,7 +38,7 @@ def get_or_create_targets(ra, dec, radius=2.):
     CREATE TEMP TABLE possible_targets (ra double precision, dec double precision);
     INSERT INTO possible_targets VALUES {values_to_add};
     SELECT s.id FROM possible_targets AS p LEFT JOIN LATERAL (
-    SELECT t.id FROM tom_targets_target AS t WHERE q3c_join(p.ra, p.dec, t.ra, t.dec, {radius / 3600.:f})
+    SELECT t.id FROM tom_targets_basetarget AS t WHERE q3c_join(p.ra, p.dec, t.ra, t.dec, {radius / 3600.:f})
     ORDER BY q3c_dist(p.ra, p.dec, t.ra, t.dec) ASC LIMIT 1) AS s ON true;
     """
     res = db.queryfetchall(query)
@@ -55,7 +55,7 @@ def get_or_create_targets(ra, dec, radius=2.):
         values_to_add = ', '.join([f"('{name}', 'SIDEREAL', NOW(), NOW(), {alpha:f}, {delta:f}, 2000, '')"
                                    for name, alpha, delta in zip(names_to_add, ra_to_add, dec_to_add)])
         query = f"""
-        INSERT INTO tom_targets_target (name, type, created, modified, ra, dec, epoch, scheme)
+        INSERT INTO tom_targets_basetarget (name, type, created, modified, ra, dec, epoch, scheme)
         VALUES {values_to_add} RETURNING id;
         """
         res = db.queryfetchall(query)

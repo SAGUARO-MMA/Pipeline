@@ -9,9 +9,13 @@ from PIL import Image
 from astropy.coordinates import SkyCoord
 import numpy as np
 
-from . import newsql
+from . import newsql, saguaro_logging
 from importlib_resources import files
 from tensorflow.keras import models
+import argparse
+import importlib
+import datetime
+import glob
 
 
 def convert_mpcorb_to_monthly_catalog(filename_in, filename_out):
@@ -283,3 +287,43 @@ def ingestion(transCatalog, log=None):
         ingest targets = {ttingest:.4f} s,
         ingest candidates = {tcingest:.4f} s.''')
         log.info(f'Ingestion: Time to complete {basefile} = {tcomp:.1f} s, {len(image_data) / tcomp:.1f} cand/s')
+
+
+def cli():
+    params = argparse.ArgumentParser(description='User parameters.')
+    params.add_argument('--telescope', default=None, help='Telescope of data.')  # telescope argument required
+    params.add_argument('--date', default=None, help='Date of files to process.')  # date argument required
+    args = params.parse_args()
+
+    t0 = time.time()
+
+    if args.telescope is None or args.date is None:  # if no telescope or date is given, exit with error
+        raise ValueError('No telescope or date given, please give telescope and date and re-run.')
+
+    try:
+        tel = importlib.import_module(f'{__package__}.{args.telescope}')  # import telescope setting file
+    except ImportError:
+        raise ValueError('No such telescope file, please check that the file is in the same directory as the pipeline.')
+
+    if '-' in args.date:
+        date = args.date.replace('-', '/')
+    elif '.' in args.date:
+        date = args.date.replace('.', '/')
+    elif '/' in args.date:
+        date = args.date
+    else:
+        date = datetime.datetime.strptime(args.date, '%Y%m%d').strftime('%Y/%m/%d')
+
+    log_path = tel.log_path()  # set logpath: where log is written
+    os.makedirs(log_path, exist_ok=True)  # if log path does not exist, make path
+
+    red_path = tel.red_path(date)  # set path where reduced science images are written to
+    os.makedirs(red_path, exist_ok=True)  # if path does not exist, make path
+
+    log_file_name = f'{log_path}/reingest_{datetime.datetime.utcnow().strftime("%Y%m%d_T%H%M%S")}'
+    logger = saguaro_logging.initialize_logger(log_file_name)
+
+    files = sorted(glob.glob(red_path + '/*_trans.fits*'))
+    for f in files:
+        ingestion(f, logger)
+    logger.info(f'Total wall-time spent: {time.time() - t0} s')
