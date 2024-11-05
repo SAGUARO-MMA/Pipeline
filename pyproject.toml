@@ -4,7 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "saguaro-pipeline"
+<<<<<<< Updated upstream
 version = "2.1.7"
+=======
+version = "2.2.1"
+>>>>>>> Stashed changes
 readme = "README.md"
 license.file = "LICENSE"
 dynamic = ["dependencies"]
