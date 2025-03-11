@@ -52,21 +52,14 @@ def get_or_create_targets(ra, dec, radius=2.):
         names_to_add = 'J' + np.char.array(coord.ra.to_string('hourangle', sep='', precision=2, pad=True)) \
                            + np.char.array(coord.dec.to_string('deg', sep='', precision=1, pad=True, alwayssign=True))
         names_to_add = np.char.replace(names_to_add, '.', '')
-        values_to_add = ', '.join([f"('{name}', 'SIDEREAL', NOW(), NOW(), {alpha:f}, {delta:f}, 2000, '')"
+        values_to_add = ', '.join([f"('{name}', 'SIDEREAL', NOW(), NOW(), 'PUBLIC', {alpha:f}, {delta:f}, 2000, '')"
                                    for name, alpha, delta in zip(names_to_add, ra_to_add, dec_to_add)])
         query = f"""
-        INSERT INTO tom_targets_basetarget (name, type, created, modified, ra, dec, epoch, scheme)
+        INSERT INTO tom_targets_basetarget (name, type, created, modified, permissions, ra, dec, epoch, scheme)
         VALUES {values_to_add} RETURNING id;
         """
         res = db.queryfetchall(query)
         target_ids[no_match] = res['id']
-
-        values_to_add = ', '.join([f"({tid}, 14, 1, 55), ({tid}, 14, 1, 56), ({tid}, 14, 1, 57)" for tid in res['id']])
-        query = f"""
-        INSERT INTO guardian_groupobjectpermission (object_pk, content_type_id, group_id, permission_id)
-        VALUES {values_to_add};
-        """
-        db.query(query)
 
     db.commit()
     db.close()
