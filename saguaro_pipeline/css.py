@@ -4,7 +4,7 @@
 Telescope setting file for CSS 1.5m Mt Lemmon telescope.
 """
 
-__version__ = "2.3.0"  # last updated 2025-05-29
+__version__ = "2.3.1"  # last updated 2025-05-30
 
 import datetime
 import gc
