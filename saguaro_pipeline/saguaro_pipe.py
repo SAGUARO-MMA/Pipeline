@@ -419,7 +419,7 @@ def main(telescope=None, date=None, cpu=None):
             plt.xlabel('Number of candidates per field')
             hist_file_name = log_file_name + '.pdf'
             plt.savefig(hist_file_name)
-            logger.slack_client.files_upload(channels='pipeline', file=hist_file_name)
+            logger.slack_client.files_upload_v2(channel='CDY2K2F9V', file=hist_file_name)
 
         logger.shutdown()
         sys.exit()
