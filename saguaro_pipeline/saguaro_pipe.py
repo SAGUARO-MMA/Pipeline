@@ -4,7 +4,7 @@
 Pipeline for real-time data reduction and image subtraction.
 """
 
-__version__ = "2.3.0"  # last updated 2025-05-29
+__version__ = "2.3.1"  # last updated 2025-05-30
 
 import argparse
 import datetime
@@ -419,7 +419,7 @@ def main(telescope=None, date=None, cpu=None):
             plt.xlabel('Number of candidates per field')
             hist_file_name = log_file_name + '.pdf'
             plt.savefig(hist_file_name)
-            logger.slack_client.files_upload(channels='pipeline', file=hist_file_name)
+            logger.slack_client.files_upload_v2(channel='CDY2K2F9V', file=hist_file_name)
 
         logger.shutdown()
         sys.exit()

@@ -3,8 +3,7 @@ try:
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
-from slack import WebClient
-from slack.errors import SlackApiError
+from slack_sdk import WebClient
 import logging
 import os
 
@@ -37,9 +36,9 @@ class MyLogger(object):
         """
         self._log.critical(text)
         try:
-            self.slack_client.chat_postMessage(channel='pipeline', text=text)
+            self.slack_client.chat_postMessage(channel='CDY2K2F9V', text=text)
         except:  # if connection error occurs, add to log
-            self._log.error('Connection error: failed to connect to slack. Above meassage not uploaded.')
+            self._log.error('Connection error: failed to connect to slack. Above message not uploaded.')
 
     @staticmethod
     def shutdown():
